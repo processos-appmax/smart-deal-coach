@@ -208,15 +208,13 @@ export default function LoginPage() {
             </div>
             <button
               type="button"
-              className="mt-3 w-full text-xs text-center text-primary/70 hover:text-primary underline underline-offset-2"
+              className="mt-3 w-full text-xs text-center text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
               onClick={() => {
-                const emailEl = document.getElementById('email') as HTMLInputElement;
-                const passEl = document.getElementById('password') as HTMLInputElement;
-                if (emailEl) emailEl.value = 'marcos.schuldz@appmax.com.br';
-                if (passEl) passEl.value = 'Appmax102030@';
+                setEmail('marcos.schuldz@appmax.com.br');
+                setPassword('Appmax102030@');
               }}
             >
-              Preencher automaticamente
+              Preencher automaticamente →
             </button>
           </div>
         </div>
