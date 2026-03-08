@@ -998,7 +998,7 @@ export default function TrainingPage() {
                     <span className="text-xs text-muted-foreground">Não realizado</span>
                   )}
                   <Button size="sm" className="bg-gradient-primary text-xs h-7" onClick={() => {
-                    if (!apiKey) { setShowAPIKey(true); return; }
+                    if (!apiKey.startsWith('sk-')) { return; }
                     setActiveSession(scenario);
                   }}>
                     <Mic className="w-3 h-3 mr-1" /> Iniciar
@@ -1066,7 +1066,7 @@ export default function TrainingPage() {
       )}
 
       {showCreate && <CreateScenarioModal onClose={() => setShowCreate(false)} />}
-      {showAPIKey && <APIKeyModal onClose={() => setShowAPIKey(false)} onSave={key => setApiKey(key)} />}
+      
     </div>
   );
 }
