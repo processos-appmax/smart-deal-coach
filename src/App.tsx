@@ -18,6 +18,7 @@ import AdminPage from "@/pages/AdminPage";
 import ReportsPage from "@/pages/ReportsPage";
 import TrainingPage from "@/pages/TrainingPage";
 import AIConfigPage from "@/pages/AIConfigPage";
+import PerformancePage from "@/pages/PerformancePage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ function ProtectedRoutes() {
         <Route path="/automations" element={<AutomationsPage />} />
         <Route path="/ai-config" element={<AIConfigPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/performance" element={<PerformancePage />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFound />} />
       </Route>

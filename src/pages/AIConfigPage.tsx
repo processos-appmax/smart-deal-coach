@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   SlidersHorizontal, Brain, Plus, X, Save, Sparkles,
   Video, MessageSquare, Trash2, GripVertical,
-  CheckCircle2, Star, Target, AlertTriangle
+  CheckCircle2, Star, Target, AlertTriangle, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -390,6 +390,48 @@ export default function AIConfigPage() {
     });
   };
 
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ score: number; summary: string; breakdown: { label: string; score: number; feedback: string }[] } | null>(null);
+
+  const handleTest = async () => {
+    const { tokens } = (() => {
+      try { return JSON.parse(localStorage.getItem('appmax_openai_tokens') || '{}'); } catch { return {}; }
+    })();
+    const token = activeType === 'meetings' ? tokens?.meetings : tokens?.whatsapp;
+    if (!token) {
+      toast({ variant: 'destructive', title: 'Token não configurado', description: 'Adicione o token OpenAI em Config. IA antes de testar.' });
+      return;
+    }
+    setTestLoading(true);
+    setTestResult(null);
+    const sampleTranscript = activeType === 'meetings'
+      ? '[VENDEDOR] Olá Pedro, tudo bem? Obrigado por reservar esse tempo.\n[LEAD] Olá! Sim, vi sua proposta e quero entender melhor.\n[VENDEDOR] Ótimo! Me conta, qual é o principal desafio da sua equipe de vendas hoje?\n[LEAD] Temos dificuldade com follow-up. Os vendedores não sabem o momento certo de abordar.\n[VENDEDOR] Entendo. Nossa plataforma resolve exatamente isso com IA. Posso mostrar?\n[LEAD] Sim, pode mostrar.\n[VENDEDOR] [Apresentação de 10 min] ...e o ROI médio dos clientes é de 35%.\n[LEAD] Interessante. Qual o preço?\n[VENDEDOR] Depende do tamanho da equipe. Para vocês, seria R$1.200/mês.\n[LEAD] Preciso consultar o financeiro.\n[VENDEDOR] Claro! Posso marcar uma call com o financeiro na semana que vem?'
+      : '[VENDEDOR] Olá Ana! Vi que você acessou nosso site. Posso ajudar?\n[LEAD] Oi! Sim, tenho interesse em automatizar o WhatsApp da minha equipe.\n[VENDEDOR] Perfeito! Quantos vendedores você tem?\n[LEAD] São 5 pessoas.\n[VENDEDOR] Ótimo perfil! Você é a decisora ou tem outras pessoas envolvidas?\n[LEAD] Sou eu mesma.\n[VENDEDOR] Qual é o principal problema que você quer resolver? Tempo de resposta, organização...?\n[LEAD] Os dois! Demora muito e fica tudo desorganizado.\n[VENDEDOR] Entendo. Nossa plataforma resolve isso. Posso te enviar um vídeo de 3 min demonstrando?\n[LEAD] Pode sim!\n[VENDEDOR] Ótimo, vou enviar agora. Posso marcar 15 min amanhã para tirar dúvidas?';
+    const criteriaText = criteria.map(c =>
+      `- ${c.label} (peso ${c.weight}%): ${c.description}`
+    ).join('\n');
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Analise esta conversa de exemplo usando os critérios abaixo e retorne APENAS JSON:\n\nCritérios:\n${criteriaText}\n\nConversa:\n${sampleTranscript}\n\nJSON esperado:\n{"totalScore":<0-100>,"summary":"<2 frases>","breakdown":[{"label":"<critério>","score":<0-100>,"feedback":"<1 frase>"}]}` },
+          ],
+          temperature: 0.3, max_tokens: 800,
+        }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
+      const data = await res.json();
+      const raw = (data.choices?.[0]?.message?.content || '').replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      setTestResult(JSON.parse(raw));
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro no teste', description: e.message });
+    } finally { setTestLoading(false); }
+  };
+
   return (
     <div className="page-container animate-fade-in">
       <div className="flex items-center justify-between mb-6">
@@ -519,16 +561,51 @@ export default function AIConfigPage() {
           </div>
 
           <div className="glass-card p-4 rounded-xl">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-accent" />
               <h3 className="text-xs font-semibold">Testar Configuração</h3>
             </div>
             <p className="text-[10px] text-muted-foreground mb-3">
-              Execute uma avaliação de teste com uma reunião/conversa existente para validar os critérios antes de salvar.
+              Roda uma conversa de exemplo com a OpenAI usando seu prompt e critérios atuais.
             </p>
-            <Button size="sm" variant="outline" className="w-full text-xs border-border h-8">
-              <Brain className="w-3.5 h-3.5 mr-1.5" /> Testar com Exemplo
+            <Button
+              size="sm"
+              className="w-full text-xs h-8 bg-gradient-primary"
+              onClick={handleTest}
+              disabled={testLoading}>
+              {testLoading
+                ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Analisando...</>
+                : <><Brain className="w-3.5 h-3.5 mr-1.5" /> Testar com Exemplo</>}
             </Button>
+
+            {testResult && (
+              <div className="mt-3 space-y-2.5 pt-3 border-t border-border/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Score</span>
+                  <span className={cn('text-lg font-bold font-mono',
+                    testResult.score >= 85 ? 'text-success' : testResult.score >= 70 ? 'text-primary' : testResult.score >= 50 ? 'text-warning' : 'text-destructive')}>
+                    {testResult.score}/100
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">{testResult.summary}</p>
+                <div className="space-y-1.5">
+                  {testResult.breakdown?.map((b, i) => (
+                    <div key={i} className="space-y-0.5">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">{b.label}</span>
+                        <span className={cn('font-bold font-mono',
+                          b.score >= 85 ? 'text-success' : b.score >= 70 ? 'text-primary' : b.score >= 50 ? 'text-warning' : 'text-destructive')}>{b.score}</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-muted overflow-hidden">
+                        <div className={cn('h-full rounded-full', b.score >= 85 ? 'bg-success' : b.score >= 70 ? 'bg-primary' : b.score >= 50 ? 'bg-warning' : 'bg-destructive')}
+                          style={{ width: `${b.score}%` }} />
+                      </div>
+                      <p className="text-[9px] text-muted-foreground/70">{b.feedback}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Weight overview */}
