@@ -304,20 +304,47 @@ export default function WhatsAppPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const loadMessages = useCallback(async (instanceName: string, remoteJid: string, scroll = false) => {
+  // loadMessages accepts optional phoneJid for @lid conversations:
+  // sent messages on Evolution are stored under the phone@s.whatsapp.net JID, not @lid
+  const loadMessages = useCallback(async (
+    instanceName: string,
+    remoteJid: string,
+    scroll = false,
+    phoneJid?: string, // e.g. "5511999998888@s.whatsapp.net"
+  ) => {
     if (scroll) setLoadingMsgs(true);
     try {
-      // Fetch both directions in parallel: received (fromMe:false) and sent (fromMe:true)
-      const [dataReceived, dataSent] = await Promise.allSettled([
+      const isLid = remoteJid.includes('@lid');
+
+      // Build all queries: received via @lid, sent via phone JID (for @lid chats), plus fallbacks
+      const queries: Promise<any>[] = [
+        // Received messages — query by the original remoteJid (works for both @lid and @s.whatsapp.net)
         evoFetch(`/chat/findMessages/${instanceName}`, {
           method: 'POST',
           body: JSON.stringify({ where: { key: { remoteJid, fromMe: false } }, limit: 60 }),
         }),
+        // Sent messages — query by original remoteJid
         evoFetch(`/chat/findMessages/${instanceName}`, {
           method: 'POST',
           body: JSON.stringify({ where: { key: { remoteJid, fromMe: true } }, limit: 60 }),
         }),
-      ]);
+      ];
+
+      // For @lid chats: also query sent/received by the real phone JID
+      if (isLid && phoneJid) {
+        queries.push(
+          evoFetch(`/chat/findMessages/${instanceName}`, {
+            method: 'POST',
+            body: JSON.stringify({ where: { key: { remoteJid: phoneJid, fromMe: false } }, limit: 60 }),
+          }),
+          evoFetch(`/chat/findMessages/${instanceName}`, {
+            method: 'POST',
+            body: JSON.stringify({ where: { key: { remoteJid: phoneJid, fromMe: true } }, limit: 60 }),
+          }),
+        );
+      }
+
+      const results = await Promise.allSettled(queries);
 
       const extractRecords = (result: PromiseSettledResult<any>): any[] => {
         if (result.status === 'rejected') return [];
@@ -327,9 +354,7 @@ export default function WhatsAppPage() {
           : Array.isArray(data) ? data : [];
       };
 
-      const rawReceived = extractRecords(dataReceived);
-      const rawSent = extractRecords(dataSent);
-      const raw = [...rawReceived, ...rawSent];
+      const raw = results.flatMap(extractRecords);
 
       // Deduplicate by message key id
       const seen = new Set<string>();
@@ -337,7 +362,7 @@ export default function WhatsAppPage() {
         .filter((m: any) => {
           if (m.messageType === 'protocolMessage' || m.messageType === 'reactionMessage') return false;
           const msgId = m.key?.id || m.id;
-          if (seen.has(msgId)) return false;
+          if (!msgId || seen.has(msgId)) return false;
           seen.add(msgId);
           return true;
         })
