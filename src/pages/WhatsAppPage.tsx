@@ -403,11 +403,34 @@ export default function WhatsAppPage() {
 
 
 
-  const filteredChats = chats.filter(c =>
-    c.name.toLowerCase().includes(chatSearch.toLowerCase()) ||
-    c.phone.includes(chatSearch) ||
-    c.lastMessage.toLowerCase().includes(chatSearch.toLowerCase())
-  );
+  const filteredChats = (() => {
+    let list = chats.filter(c =>
+      c.name.toLowerCase().includes(chatSearch.toLowerCase()) ||
+      c.phone.includes(chatSearch) ||
+      c.lastMessage.toLowerCase().includes(chatSearch.toLowerCase())
+    );
+
+    // Status filter
+    if (chatFilter === 'pending') {
+      list = list.filter(c => c.unread > 0);
+    } else if (chatFilter === 'unreplied') {
+      // Last message is from the lead (not from me) AND unread === 0 (already seen)
+      list = list.filter(c => !c.lastMessageFromMe && c.unread === 0);
+    } else if (chatFilter === 'replied') {
+      list = list.filter(c => c.lastMessageFromMe);
+    }
+
+    // Sort
+    list = [...list].sort((a, b) => {
+      if (chatSortKey === 'oldest') return a.lastMessageTs - b.lastMessageTs;
+      if (chatSortKey === 'alpha_asc') return (a.name || a.phone).localeCompare(b.name || b.phone, 'pt-BR');
+      if (chatSortKey === 'alpha_desc') return (b.name || b.phone).localeCompare(a.name || a.phone, 'pt-BR');
+      return b.lastMessageTs - a.lastMessageTs; // 'recent' default
+    });
+
+    return list;
+  })();
+
 
   const displayName = (c: Chat) => (c.name && c.name !== c.phone ? c.name : c.phone);
 
