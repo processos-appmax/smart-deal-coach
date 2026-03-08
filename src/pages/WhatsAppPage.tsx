@@ -609,7 +609,7 @@ export default function WhatsAppPage() {
                     <p className={cn('text-xs font-semibold truncate', hasUnread ? 'text-foreground' : 'text-foreground/80')}>
                       {displayName(chat)}
                     </p>
-                    <span className={cn('text-[10px] flex-shrink-0', hasUnread ? 'text-destructive font-semibold' : 'text-muted-foreground')}>
+                    <span className={cn('text-[10px] flex-shrink-0', hasUnread ? 'text-success font-semibold' : 'text-muted-foreground')}>
                       {chat.lastMessageTs
                         ? new Date(chat.lastMessageTs * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
                         : ''}
