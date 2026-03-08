@@ -215,55 +215,34 @@ export default function WhatsAppPage() {
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
 
   // resolvePhone: for @lid JIDs, use the @lid number itself as the unique identifier.
-  // DO NOT use remoteJidAlt — that field contains the INSTANCE OWNER's JID, not the contact's.
+  // resolvePhone: extracts the numeric identifier from the JID for deduplication purposes only.
+  // For @lid JIDs this will be the LID number (used as map key only, not displayed).
   const resolvePhone = (c: any): string => {
     const jid: string = c.remoteJid || '';
-    // Strip the @domain suffix to get the numeric identifier
     return jid.replace(/@.*/, '');
+  };
+
+  // getRealPhone: returns the real phone number to display.
+  // Priority: API fields > extract from @s.whatsapp.net JID > fallback to LID number.
+  const getRealPhone = (c: any): string => {
+    // Some Evolution API responses include the real phone directly
+    if (c.phone) return String(c.phone).replace(/\D/g, '');
+    if (c.number) return String(c.number).replace(/\D/g, '');
+    if (c.contact?.phone) return String(c.contact.phone).replace(/\D/g, '');
+    const jid: string = c.remoteJid || '';
+    if (!jid.includes('@lid')) {
+      // @s.whatsapp.net — the number IS the phone
+      return jid.replace(/@.*/, '');
+    }
+    // @lid — we don't have the real phone yet, return empty (will be updated on merge)
+    return '';
   };
 
 
   const parseBody = (m: any): string => {
-    const msg = m.message || {};
-    return (
-      msg.conversation ||
-      msg.extendedTextMessage?.text ||
-      msg.imageMessage?.caption ||
-      msg.videoMessage?.caption ||
-      msg.documentMessage?.title ||
-      (msg.audioMessage ? '🎵 Áudio' : '') ||
-      (msg.stickerMessage ? '🪄 Sticker' : '') ||
-      (msg.locationMessage ? '📍 Localização' : '') ||
-      '[mídia]'
-    );
-  };
-
-  const loadChats = useCallback(async (instanceName: string, silent = false) => {
-    if (!silent) {
-      setLoadingChats(true);
-      setChats([]);
-    }
-    try {
-      const data = await evoFetch(`/chat/findChats/${instanceName}`, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      });
-      const raw: any[] = Array.isArray(data) ? data : (data?.chats || []);
-
-      // Deduplicate by phone — prefer @lid JID as primary (it has both sent+received)
-      // Key insight: Evolution stores received msgs under @lid and sent under @s.whatsapp.net
-      // We must query BOTH. Always keep @lid as remoteJid and phone JID as remoteJidAlt.
-      const phoneMap = new Map<string, Chat>();
-      for (const c of raw) {
-        const phone = resolvePhone(c);
-        if (!phone) continue;
-        const ts =
-          c.lastMessage?.messageTimestamp ||
-          (c.updatedAt ? Math.floor(new Date(c.updatedAt).getTime() / 1000) : 0);
-
-        const jid: string = c.remoteJid || c.id || '';
+...
+      const jid: string = c.remoteJid || c.id || '';
         const isLid = jid.includes('@lid');
-        const phoneJid = phone ? `${phone}@s.whatsapp.net` : undefined;
 
         const existing = phoneMap.get(phone);
 
