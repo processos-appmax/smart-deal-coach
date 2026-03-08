@@ -57,8 +57,8 @@ export default function AdminPage() {
               <h2 className="font-display font-semibold text-lg">Configurações da Empresa</h2>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { label: 'Nome da Empresa', value: 'Deal Intel', placeholder: 'Sua empresa' },
-                  { label: 'Domínio', value: 'dealintel.com.br', placeholder: 'dominio.com.br' },
+                  { label: 'Nome da Empresa', value: 'Appmax', placeholder: 'Sua empresa' },
+                  { label: 'Domínio', value: 'appmax.com.br', placeholder: 'dominio.com.br' },
                   { label: 'CNPJ', value: '', placeholder: '00.000.000/0001-00' },
                   { label: 'Email de Contato', value: 'admin@dealintel.com.br', placeholder: 'admin@empresa.com' },
                 ].map(f => (
