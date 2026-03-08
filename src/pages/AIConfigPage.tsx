@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +9,14 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+
+// ─── Storage keys (shared with WhatsApp analysis panel) ──────────────────────
+export const AI_CONFIG_STORAGE = {
+  WHATSAPP_CRITERIA:   'appmax_ai_whatsapp_criteria',
+  WHATSAPP_PROMPT:     'appmax_ai_whatsapp_prompt',
+  MEETINGS_CRITERIA:   'appmax_ai_meetings_criteria',
+  MEETINGS_PROMPT:     'appmax_ai_meetings_prompt',
+};
 
 interface EvalCriteria {
   id: string;
