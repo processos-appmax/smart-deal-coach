@@ -310,11 +310,29 @@ export default function WhatsAppPage() {
       }
       // Sort by latest message
       const sorted = Array.from(phoneMap.values()).sort((a, b) => b.lastMessageTs - a.lastMessageTs);
-      setChats(sorted.slice(0, 200));
+      if (silent) {
+        // On silent poll: merge unread counts but keep 0 for the active chat
+        setChats(prev => {
+          const prevMap = new Map(prev.map(c => [c.id, c]));
+          return sorted.map(newChat => {
+            const existing = prevMap.get(newChat.id);
+            // If this chat is currently open, keep unread = 0
+            const isOpen = activeChatRef.current?.id === newChat.id;
+            return {
+              ...newChat,
+              unread: isOpen ? 0 : newChat.unread,
+              // If we had previously zeroed a badge by clicking, don't re-show unless there's actually new unread
+              ...(existing && existing.unread === 0 && newChat.unread === 0 ? {} : {}),
+            };
+          });
+        });
+      } else {
+        setChats(sorted.slice(0, 200));
+      }
     } catch {
-      setChats([]);
+      if (!silent) setChats([]);
     } finally {
-      setLoadingChats(false);
+      if (!silent) setLoadingChats(false);
     }
   }, []);
 
