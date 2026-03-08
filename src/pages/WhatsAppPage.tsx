@@ -818,24 +818,6 @@ export default function WhatsAppPage() {
                   </div>
                 </div>
               ))}
-                  <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-bold flex-shrink-0 border border-border">
-                    {(chat.name || '?')[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <p className="text-xs font-semibold truncate">{chat.name}</p>
-                      {chat.lastMessageTs > 0 && (
-                        <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-1">
-                          {new Date(chat.lastMessageTs * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground truncate">{chat.lastMessage || '...'}</p>
-                    {chat.unread > 0 && (
-                      <span className="mt-1 inline-flex w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] items-center justify-center font-bold">{chat.unread}</span>
-                    )}
-                  </div>
-                </div>
               ))}
             </div>
           </div>
