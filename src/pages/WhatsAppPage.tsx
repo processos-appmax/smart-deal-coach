@@ -375,42 +375,51 @@ export default function WhatsAppPage() {
   const activeChatRef = useRef<Chat | null>(null);
   useEffect(() => { activeChatRef.current = activeChat; }, [activeChat]);
 
-  // loadMessages: for @lid chats, query the @lid directly (Evolution stores both directions under @lid).
-  // Do NOT add phoneJid = remoteJidAlt, because remoteJidAlt is the instance owner's JID, not the contact's.
+  // loadMessages: fetches from BOTH @lid (received) and @s.whatsapp.net (sent) JIDs and merges
   const loadMessages = useCallback(async (
     instanceName: string,
-    remoteJid: string,
+    chat: Chat,
     scroll = false,
   ) => {
     if (scroll) setLoadingMsgs(true);
     try {
-      const data = await evoFetch(`/chat/findMessages/${instanceName}`, {
-        method: 'POST',
-        body: JSON.stringify({ where: { key: { remoteJid } }, limit: 60 }),
-      });
+      // Build list of JIDs to query
+      const jids = [chat.remoteJid];
+      if (chat.remoteJidAlt) jids.push(chat.remoteJidAlt);
 
-      const raw: any[] = Array.isArray(data?.messages?.records)
-        ? data.messages.records
-        : Array.isArray(data) ? data : [];
+      const results = await Promise.all(
+        jids.map(jid =>
+          evoFetch(`/chat/findMessages/${instanceName}`, {
+            method: 'POST',
+            body: JSON.stringify({ where: { key: { remoteJid: jid } }, limit: 60 }),
+          }).catch(() => null)
+        )
+      );
 
-      // Deduplicate by message key id
       const seen = new Set<string>();
-      const parsed: Message[] = raw
-        .filter((m: any) => {
-          if (m.messageType === 'protocolMessage' || m.messageType === 'reactionMessage') return false;
-          const msgId = m.key?.id || m.id;
-          if (!msgId || seen.has(msgId)) return false;
-          seen.add(msgId);
-          return true;
-        })
-        .map((m: any) => ({
-          id: m.key?.id || m.id || `${m.messageTimestamp}_${Math.random()}`,
-          fromMe: m.key?.fromMe === true,
-          body: parseBody(m),
-          timestamp: m.messageTimestamp || 0,
-        }))
-        .sort((a, b) => a.timestamp - b.timestamp);
+      const parsed: Message[] = [];
 
+      for (const data of results) {
+        if (!data) continue;
+        const raw: any[] = Array.isArray(data?.messages?.records)
+          ? data.messages.records
+          : Array.isArray(data) ? data : [];
+
+        for (const m of raw) {
+          if (m.messageType === 'protocolMessage' || m.messageType === 'reactionMessage') continue;
+          const msgId = m.key?.id || m.id;
+          if (!msgId || seen.has(msgId)) continue;
+          seen.add(msgId);
+          parsed.push({
+            id: msgId,
+            fromMe: m.key?.fromMe === true,
+            body: parseBody(m),
+            timestamp: m.messageTimestamp || 0,
+          });
+        }
+      }
+
+      parsed.sort((a, b) => a.timestamp - b.timestamp);
       setMessages(parsed);
     } catch { /* silent */ }
     finally { if (scroll) setLoadingMsgs(false); }
