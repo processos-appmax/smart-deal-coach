@@ -515,7 +515,8 @@ export default function WhatsAppPage() {
 
   // Start new conversation
   const handleNewConversation = (remoteJid: string, name: string) => {
-    const newChat: Chat = { id: remoteJid, remoteJid, name, lastMessage: '', lastMessageTs: 0, unread: 0 };
+    const phone = remoteJid.replace(/@.*/, '');
+    const newChat: Chat = { id: remoteJid, remoteJid, phone, name, lastMessage: '', lastMessageTs: 0, unread: 0 };
     setChats(prev => [newChat, ...prev.filter(c => c.remoteJid !== remoteJid)]);
     setActiveChat(newChat);
   };
