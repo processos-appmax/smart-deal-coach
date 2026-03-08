@@ -24,6 +24,7 @@ const EVOLUTION_API_TOKEN = '3ce7a42f9bd96ea526b2b0bc39a4faec';
 interface Chat {
   id: string;
   remoteJid: string;
+  remoteJidAlt?: string; // phone JID when remoteJid is @lid
   name: string;
   phone: string;
   lastMessage: string;
@@ -253,10 +254,15 @@ export default function WhatsAppPage() {
           c.lastMessage?.messageTimestamp ||
           (c.updatedAt ? Math.floor(new Date(c.updatedAt).getTime() / 1000) : 0);
         const existing = phoneMap.get(phone);
+        // Extract the real phone JID (remoteJidAlt) for @lid conversations
+        const remoteJidAlt =
+          c.lastMessage?.key?.remoteJidAlt ||
+          (phone ? `${phone}@s.whatsapp.net` : undefined);
         if (!existing || ts > existing.lastMessageTs) {
           phoneMap.set(phone, {
             id: c.id || c.remoteJid,
             remoteJid: c.remoteJid || c.id || '',
+            remoteJidAlt,
             phone,
             name: c.name || c.pushName || c.lastMessage?.pushName || phone || 'Desconhecido',
             lastMessage:
@@ -304,47 +310,30 @@ export default function WhatsAppPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // loadMessages accepts optional phoneJid for @lid conversations:
-  // sent messages on Evolution are stored under the phone@s.whatsapp.net JID, not @lid
+  // loadMessages: single query without fromMe filter — the API ignores it anyway.
+  // For @lid chats, also query by the phone JID to get all messages from both sides.
   const loadMessages = useCallback(async (
     instanceName: string,
     remoteJid: string,
     scroll = false,
-    phoneJid?: string, // e.g. "5511999998888@s.whatsapp.net"
+    phoneJid?: string,
   ) => {
     if (scroll) setLoadingMsgs(true);
     try {
       const isLid = remoteJid.includes('@lid');
 
-      // Build all queries: received via @lid, sent via phone JID (for @lid chats), plus fallbacks
-      const queries: Promise<any>[] = [
-        // Received messages — query by the original remoteJid (works for both @lid and @s.whatsapp.net)
-        evoFetch(`/chat/findMessages/${instanceName}`, {
-          method: 'POST',
-          body: JSON.stringify({ where: { key: { remoteJid, fromMe: false } }, limit: 60 }),
-        }),
-        // Sent messages — query by original remoteJid
-        evoFetch(`/chat/findMessages/${instanceName}`, {
-          method: 'POST',
-          body: JSON.stringify({ where: { key: { remoteJid, fromMe: true } }, limit: 60 }),
-        }),
-      ];
+      // Build queries — NO fromMe filter (Evolution API ignores it and can return wrong results)
+      const jidsToQuery = new Set<string>([remoteJid]);
+      if (isLid && phoneJid) jidsToQuery.add(phoneJid);
 
-      // For @lid chats: also query sent/received by the real phone JID
-      if (isLid && phoneJid) {
-        queries.push(
+      const results = await Promise.allSettled(
+        Array.from(jidsToQuery).map(jid =>
           evoFetch(`/chat/findMessages/${instanceName}`, {
             method: 'POST',
-            body: JSON.stringify({ where: { key: { remoteJid: phoneJid, fromMe: false } }, limit: 60 }),
-          }),
-          evoFetch(`/chat/findMessages/${instanceName}`, {
-            method: 'POST',
-            body: JSON.stringify({ where: { key: { remoteJid: phoneJid, fromMe: true } }, limit: 60 }),
-          }),
-        );
-      }
-
-      const results = await Promise.allSettled(queries);
+            body: JSON.stringify({ where: { key: { remoteJid: jid } }, limit: 60 }),
+          })
+        )
+      );
 
       const extractRecords = (result: PromiseSettledResult<any>): any[] => {
         if (result.status === 'rejected') return [];
@@ -379,9 +368,11 @@ export default function WhatsAppPage() {
     finally { if (scroll) setLoadingMsgs(false); }
   }, []);
 
-  // Helper: build phone JID from chat for @lid conversations
+
+  // Helper: get the phone JID for @lid conversations — prefer remoteJidAlt, fallback to phone
   const getPhoneJid = (chat: Chat) =>
-    chat.phone ? `${chat.phone}@s.whatsapp.net` : undefined;
+    chat.remoteJidAlt || (chat.phone ? `${chat.phone}@s.whatsapp.net` : undefined);
+
 
   useEffect(() => {
     if (!activeChat || !activeInstance) return;
