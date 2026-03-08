@@ -55,6 +55,7 @@ function ProtectedRoutes() {
         <Route path="/automations" element={<AutomationsPage />} />
         <Route path="/ai-config" element={<AIConfigPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/performance" element={<PerformancePage />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFound />} />
       </Route>
