@@ -1211,6 +1211,15 @@ export default function WhatsAppPage() {
           )}
         </div>
 
+        {/* ════ COLUMN 4 — AI ANALYSIS ══════════════════════════════════════ */}
+        {activeChat && showAiPanel && (
+          <AIAnalysisPanel
+            chat={activeChat}
+            messages={messages}
+            apiToken={tokens.whatsapp}
+          />
+        )}
+
       </div>
 
       {/* Modals */}
