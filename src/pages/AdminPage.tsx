@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { MOCK_USERS } from '@/data/mockData';
+import { MOCK_USERS, MOCK_TEAMS } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Shield, Users, Plug2, Bell, Building2, Key,
   ChevronRight, CheckCircle2, AlertCircle, Save, Eye, EyeOff,
-  TrendingUp, Lock, ToggleLeft, ToggleRight
+  TrendingUp, Lock, ToggleLeft, ToggleRight, SlidersHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAppConfig, type ModuleId } from '@/contexts/AppConfigContext';
+import { useAppConfig, DEFAULT_MODULES, type ModuleId } from '@/contexts/AppConfigContext';
 import { useToast } from '@/hooks/use-toast';
 
 const ADMIN_SECTIONS = [
