@@ -581,7 +581,7 @@ export default function WhatsAppPage() {
             </p>
             {activeInstance && isConnected && (
               <button
-                onClick={() => loadChats(activeInstance.name)}
+                onClick={() => loadChats(activeInstance.name, true)}
                 className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
                 <RefreshCw className="w-3 h-3" />
               </button>
