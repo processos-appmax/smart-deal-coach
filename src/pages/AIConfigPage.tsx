@@ -66,7 +66,7 @@ const DEFAULT_MEETING_CRITERIA: EvalCriteria[] = [
   },
 ];
 
-const DEFAULT_WHATSAPP_CRITERIA: EvalCriteria[] = [
+export const DEFAULT_WHATSAPP_CRITERIA: EvalCriteria[] = [
   {
     id: 'response_time', label: 'Tempo de Resposta', weight: 15,
     description: 'Velocidade e consistência nas respostas ao lead',
