@@ -391,6 +391,7 @@ export default function UsersPage() {
             <tr>
               <th className="text-left">Usuário</th>
               <th className="text-left hidden md:table-cell">Email</th>
+              <th className="text-center hidden xl:table-cell">WhatsApp</th>
               <th className="text-center">Perfil</th>
               <th className="text-center">Status</th>
               <th className="text-center hidden lg:table-cell">Desde</th>
@@ -401,6 +402,8 @@ export default function UsersPage() {
             {filtered.map(u => {
               const rc = ROLE_CONFIG[u.role];
               const isSelf = u.id === currentUser?.id;
+              const instId = getInstanceForUser(u.id);
+              const assignedInst = MOCK_WHATSAPP_INSTANCES.find(i => i.id === instId);
               return (
                 <tr key={u.id} className={cn(u.status === 'inactive' && 'opacity-60')}>
                   <td>
