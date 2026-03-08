@@ -37,36 +37,36 @@ export const MOCK_EVALUATIONS: Evaluation[] = [
 ];
 
 export const MOCK_WHATSAPP_INSTANCES: WhatsAppInstance[] = [
-  { id: 'wa_001', name: 'Vendas Principal', phone: '+55 11 99999-0001', status: 'connected', userId: 'usr_004', teamId: 'team_001', lastSeen: '2024-11-24T16:30:00', createdAt: '2024-10-01' },
-  { id: 'wa_002', name: 'SDR Team Beta', phone: '+55 11 99999-0002', status: 'connected', userId: 'usr_005', teamId: 'team_002', lastSeen: '2024-11-24T15:00:00', createdAt: '2024-10-15' },
-  { id: 'wa_003', name: 'Closer CS', phone: '+55 21 99999-0003', status: 'disconnected', userId: 'usr_006', teamId: 'team_002', lastSeen: '2024-11-22T10:00:00', createdAt: '2024-11-01' },
+  { id: 'wa_001', name: 'Vendas Principal', phone: '+55 11 99999-0001', status: 'connected', userId: 'usr_004', teamId: 'team_001', lastSeen: '2026-03-08T16:30:00', createdAt: '2026-01-01' },
+  { id: 'wa_002', name: 'SDR Team Beta', phone: '+55 11 99999-0002', status: 'connected', userId: 'usr_005', teamId: 'team_002', lastSeen: '2026-03-08T15:00:00', createdAt: '2026-01-15' },
+  { id: 'wa_003', name: 'Closer CS', phone: '+55 21 99999-0003', status: 'disconnected', userId: 'usr_006', teamId: 'team_002', lastSeen: '2026-03-06T10:00:00', createdAt: '2026-02-01' },
 ];
 
 export const MOCK_CONVERSATIONS: Conversation[] = [
-  { id: 'conv_001', instanceId: 'wa_001', contactName: 'Roberto Faria', contactPhone: '+55 11 91234-5678', lastMessage: 'Pode me enviar a proposta comercial?', lastMessageAt: '2024-11-24T16:20:00', unreadCount: 2, assignedTo: 'usr_004', tags: ['quente', 'demo'], score: 82, aiAnalyzed: true },
-  { id: 'conv_002', instanceId: 'wa_001', contactName: 'Patricia Nunes', contactPhone: '+55 11 98765-4321', lastMessage: 'Ótima apresentação! Vou levar para o board.', lastMessageAt: '2024-11-24T14:10:00', unreadCount: 0, assignedTo: 'usr_004', tags: ['morno'], score: 75, aiAnalyzed: true },
-  { id: 'conv_003', instanceId: 'wa_002', contactName: 'Marcos Vieira', contactPhone: '+55 21 97654-3210', lastMessage: 'Quando posso agendar outra call?', lastMessageAt: '2024-11-24T11:30:00', unreadCount: 1, assignedTo: 'usr_005', tags: ['quente', 'fechamento'], score: 91, aiAnalyzed: true },
-  { id: 'conv_004', instanceId: 'wa_002', contactName: 'Ana Lima', contactPhone: '+55 31 96543-2109', lastMessage: 'Preciso pensar melhor sobre o investimento.', lastMessageAt: '2024-11-23T17:00:00', unreadCount: 0, assignedTo: 'usr_005', tags: ['frio', 'objeção-preço'], score: 40, aiAnalyzed: false },
-  { id: 'conv_005', instanceId: 'wa_003', contactName: 'Carlos Stein', contactPhone: '+55 11 95432-1098', lastMessage: 'Fechamos! Me manda o contrato.', lastMessageAt: '2024-11-24T09:00:00', unreadCount: 3, assignedTo: 'usr_006', tags: ['fechado'], aiAnalyzed: false },
+  { id: 'conv_001', instanceId: 'wa_001', contactName: 'Roberto Faria', contactPhone: '+55 11 91234-5678', lastMessage: 'Pode me enviar a proposta comercial?', lastMessageAt: '2026-03-08T16:20:00', unreadCount: 2, assignedTo: 'usr_004', tags: ['quente', 'demo'], score: 82, aiAnalyzed: true },
+  { id: 'conv_002', instanceId: 'wa_001', contactName: 'Patricia Nunes', contactPhone: '+55 11 98765-4321', lastMessage: 'Ótima apresentação! Vou levar para o board.', lastMessageAt: '2026-03-08T14:10:00', unreadCount: 0, assignedTo: 'usr_004', tags: ['morno'], score: 75, aiAnalyzed: true },
+  { id: 'conv_003', instanceId: 'wa_002', contactName: 'Marcos Vieira', contactPhone: '+55 21 97654-3210', lastMessage: 'Quando posso agendar outra call?', lastMessageAt: '2026-03-08T11:30:00', unreadCount: 1, assignedTo: 'usr_005', tags: ['quente', 'fechamento'], score: 91, aiAnalyzed: true },
+  { id: 'conv_004', instanceId: 'wa_002', contactName: 'Ana Lima', contactPhone: '+55 31 96543-2109', lastMessage: 'Preciso pensar melhor sobre o investimento.', lastMessageAt: '2026-03-07T17:00:00', unreadCount: 0, assignedTo: 'usr_005', tags: ['frio', 'objeção-preço'], score: 40, aiAnalyzed: false },
+  { id: 'conv_005', instanceId: 'wa_003', contactName: 'Carlos Stein', contactPhone: '+55 11 95432-1098', lastMessage: 'Fechamos! Me manda o contrato.', lastMessageAt: '2026-03-08T09:00:00', unreadCount: 3, assignedTo: 'usr_006', tags: ['fechado'], aiAnalyzed: false },
 ];
 
 export const MOCK_MESSAGES: Record<string, WhatsAppMessage[]> = {
   conv_001: [
-    { id: 'msg_001', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 91234-5678', to: '+55 11 99999-0001', body: 'Olá! Tudo bem? Vi que vocês têm uma solução interessante.', type: 'text', direction: 'inbound', timestamp: '2024-11-24T15:00:00' },
-    { id: 'msg_002', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 99999-0001', to: '+55 11 91234-5678', body: 'Olá Roberto! Tudo ótimo sim. Que bom que se interessou! Posso te explicar melhor nossa solução?', type: 'text', direction: 'outbound', timestamp: '2024-11-24T15:05:00' },
-    { id: 'msg_003', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 91234-5678', to: '+55 11 99999-0001', body: 'Claro! Qual o diferencial de vocês?', type: 'text', direction: 'inbound', timestamp: '2024-11-24T15:10:00' },
-    { id: 'msg_004', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 99999-0001', to: '+55 11 91234-5678', body: 'Nossa plataforma usa IA para analisar reuniões e dar feedbacks automáticos para sua equipe. Taxa de conversão média aumenta em 35%!', type: 'text', direction: 'outbound', timestamp: '2024-11-24T15:15:00' },
-    { id: 'msg_005', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 91234-5678', to: '+55 11 99999-0001', body: 'Pode me enviar a proposta comercial?', type: 'text', direction: 'inbound', timestamp: '2024-11-24T16:20:00' },
+    { id: 'msg_001', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 91234-5678', to: '+55 11 99999-0001', body: 'Olá! Tudo bem? Vi que vocês têm uma solução interessante.', type: 'text', direction: 'inbound', timestamp: '2026-03-08T15:00:00' },
+    { id: 'msg_002', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 99999-0001', to: '+55 11 91234-5678', body: 'Olá Roberto! Tudo ótimo sim. Que bom que se interessou! Posso te explicar melhor nossa solução?', type: 'text', direction: 'outbound', timestamp: '2026-03-08T15:05:00' },
+    { id: 'msg_003', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 91234-5678', to: '+55 11 99999-0001', body: 'Claro! Qual o diferencial de vocês?', type: 'text', direction: 'inbound', timestamp: '2026-03-08T15:10:00' },
+    { id: 'msg_004', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 99999-0001', to: '+55 11 91234-5678', body: 'Nossa plataforma usa IA para analisar reuniões e dar feedbacks automáticos para sua equipe. Taxa de conversão média aumenta em 35%!', type: 'text', direction: 'outbound', timestamp: '2026-03-08T15:15:00' },
+    { id: 'msg_005', instanceId: 'wa_001', conversationId: 'conv_001', from: '+55 11 91234-5678', to: '+55 11 99999-0001', body: 'Pode me enviar a proposta comercial?', type: 'text', direction: 'inbound', timestamp: '2026-03-08T16:20:00' },
   ],
 };
 
 export const MOCK_INTEGRATIONS: Integration[] = [
-  { id: 'int_001', type: 'google_calendar', name: 'Google Calendar', status: 'connected', configuredAt: '2024-10-01' },
-  { id: 'int_002', type: 'google_meet', name: 'Google Meet', status: 'connected', configuredAt: '2024-10-01' },
+  { id: 'int_001', type: 'google_calendar', name: 'Google Calendar', status: 'connected', configuredAt: '2026-01-01' },
+  { id: 'int_002', type: 'google_meet', name: 'Google Meet', status: 'connected', configuredAt: '2026-01-01' },
   { id: 'int_003', type: 'hubspot', name: 'HubSpot CRM', status: 'disconnected' },
-  { id: 'int_004', type: 'openai', name: 'OpenAI API', status: 'connected', configuredAt: '2024-10-15' },
-  { id: 'int_005', type: 'evolution_api', name: 'Evolution API (WhatsApp)', status: 'connected', configuredAt: '2024-11-01' },
-  { id: 'int_006', type: 'n8n', name: 'N8N Automações', status: 'error', configuredAt: '2024-11-10' },
+  { id: 'int_004', type: 'openai', name: 'OpenAI API', status: 'connected', configuredAt: '2026-01-15' },
+  { id: 'int_005', type: 'evolution_api', name: 'Evolution API (WhatsApp)', status: 'connected', configuredAt: '2026-02-01' },
+  { id: 'int_006', type: 'n8n', name: 'N8N Automações', status: 'error', configuredAt: '2026-02-10' },
 ];
 
 export const CHART_DATA = {
