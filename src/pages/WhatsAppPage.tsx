@@ -599,7 +599,7 @@ export default function WhatsAppPage() {
                 <div className="relative flex-shrink-0 mt-0.5">
                   <AvatarInitials name={displayName(chat)} size="sm" />
                   {hasUnread && (
-                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-destructive border-2 border-background flex items-center justify-center text-[9px] text-white font-bold px-0.5">
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-success border-2 border-background flex items-center justify-center text-[9px] text-white font-bold px-0.5">
                       {chat.unread > 99 ? '99+' : chat.unread}
                     </span>
                   )}
