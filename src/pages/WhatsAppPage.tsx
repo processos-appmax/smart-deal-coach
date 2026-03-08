@@ -616,6 +616,22 @@ export default function WhatsAppPage() {
             </button>
           </div>
 
+          {/* Team filter — admins only */}
+          {isAdmin && (
+            <div className="px-2 py-1.5 border-b border-border flex-shrink-0">
+              <select
+                value={instTeamFilter}
+                onChange={e => setInstTeamFilter(e.target.value)}
+                className="w-full text-[10px] bg-secondary text-muted-foreground rounded-md px-2 py-1.5 border border-border focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer">
+                <option value="all">🏷 Todos os times</option>
+                {MOCK_TEAMS.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+                <option value="unassigned">Sem time</option>
+              </select>
+            </div>
+          )}
+
           {/* Instances List */}
           <div className="flex-1 overflow-y-auto">
             {evoLoading && (
