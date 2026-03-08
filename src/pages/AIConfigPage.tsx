@@ -561,16 +561,51 @@ export default function AIConfigPage() {
           </div>
 
           <div className="glass-card p-4 rounded-xl">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-accent" />
               <h3 className="text-xs font-semibold">Testar Configuração</h3>
             </div>
             <p className="text-[10px] text-muted-foreground mb-3">
-              Execute uma avaliação de teste com uma reunião/conversa existente para validar os critérios antes de salvar.
+              Roda uma conversa de exemplo com a OpenAI usando seu prompt e critérios atuais.
             </p>
-            <Button size="sm" variant="outline" className="w-full text-xs border-border h-8">
-              <Brain className="w-3.5 h-3.5 mr-1.5" /> Testar com Exemplo
+            <Button
+              size="sm"
+              className="w-full text-xs h-8 bg-gradient-primary"
+              onClick={handleTest}
+              disabled={testLoading}>
+              {testLoading
+                ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Analisando...</>
+                : <><Brain className="w-3.5 h-3.5 mr-1.5" /> Testar com Exemplo</>}
             </Button>
+
+            {testResult && (
+              <div className="mt-3 space-y-2.5 pt-3 border-t border-border/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Score</span>
+                  <span className={cn('text-lg font-bold font-mono',
+                    testResult.score >= 85 ? 'text-success' : testResult.score >= 70 ? 'text-primary' : testResult.score >= 50 ? 'text-warning' : 'text-destructive')}>
+                    {testResult.score}/100
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">{testResult.summary}</p>
+                <div className="space-y-1.5">
+                  {testResult.breakdown?.map((b, i) => (
+                    <div key={i} className="space-y-0.5">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">{b.label}</span>
+                        <span className={cn('font-bold font-mono',
+                          b.score >= 85 ? 'text-success' : b.score >= 70 ? 'text-primary' : b.score >= 50 ? 'text-warning' : 'text-destructive')}>{b.score}</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-muted overflow-hidden">
+                        <div className={cn('h-full rounded-full', b.score >= 85 ? 'bg-success' : b.score >= 70 ? 'bg-primary' : b.score >= 50 ? 'bg-warning' : 'bg-destructive')}
+                          style={{ width: `${b.score}%` }} />
+                      </div>
+                      <p className="text-[9px] text-muted-foreground/70">{b.feedback}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Weight overview */}
