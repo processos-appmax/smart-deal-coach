@@ -905,18 +905,17 @@ export default function TrainingPage() {
           <p className="text-sm text-muted-foreground">Simulações de vendas por voz com IA em tempo real</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAPIKey(true)}
+          <span
             className={cn(
-              'flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition-colors',
-              apiKey
-                ? 'border-success/30 text-success bg-success/5 hover:bg-success/10'
-                : 'border-warning/30 text-warning bg-warning/5 hover:bg-warning/10'
+              'flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5',
+              apiKey.startsWith('sk-')
+                ? 'border-success/30 text-success bg-success/5'
+                : 'border-warning/30 text-warning bg-warning/5'
             )}
           >
             <Key className="w-3 h-3" />
-            {apiKey ? 'OpenAI conectado ✓' : 'Configurar OpenAI'}
-          </button>
+            {apiKey.startsWith('sk-') ? 'Token de treinamento ✓' : 'Configure em Admin → Tokens OpenAI'}
+          </span>
           {isAdmin && (
             <Button size="sm" className="bg-gradient-primary text-xs h-8" onClick={() => setShowCreate(true)}>
               <Plus className="w-3.5 h-3.5 mr-1.5" /> Criar Cenário
