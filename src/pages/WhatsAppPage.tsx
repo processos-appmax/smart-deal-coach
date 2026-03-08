@@ -304,47 +304,30 @@ export default function WhatsAppPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // loadMessages accepts optional phoneJid for @lid conversations:
-  // sent messages on Evolution are stored under the phone@s.whatsapp.net JID, not @lid
+  // loadMessages: single query without fromMe filter — the API ignores it anyway.
+  // For @lid chats, also query by the phone JID to get all messages from both sides.
   const loadMessages = useCallback(async (
     instanceName: string,
     remoteJid: string,
     scroll = false,
-    phoneJid?: string, // e.g. "5511999998888@s.whatsapp.net"
+    phoneJid?: string,
   ) => {
     if (scroll) setLoadingMsgs(true);
     try {
       const isLid = remoteJid.includes('@lid');
 
-      // Build all queries: received via @lid, sent via phone JID (for @lid chats), plus fallbacks
-      const queries: Promise<any>[] = [
-        // Received messages — query by the original remoteJid (works for both @lid and @s.whatsapp.net)
-        evoFetch(`/chat/findMessages/${instanceName}`, {
-          method: 'POST',
-          body: JSON.stringify({ where: { key: { remoteJid, fromMe: false } }, limit: 60 }),
-        }),
-        // Sent messages — query by original remoteJid
-        evoFetch(`/chat/findMessages/${instanceName}`, {
-          method: 'POST',
-          body: JSON.stringify({ where: { key: { remoteJid, fromMe: true } }, limit: 60 }),
-        }),
-      ];
+      // Build queries — NO fromMe filter (Evolution API ignores it and can return wrong results)
+      const jidsToQuery = new Set<string>([remoteJid]);
+      if (isLid && phoneJid) jidsToQuery.add(phoneJid);
 
-      // For @lid chats: also query sent/received by the real phone JID
-      if (isLid && phoneJid) {
-        queries.push(
+      const results = await Promise.allSettled(
+        Array.from(jidsToQuery).map(jid =>
           evoFetch(`/chat/findMessages/${instanceName}`, {
             method: 'POST',
-            body: JSON.stringify({ where: { key: { remoteJid: phoneJid, fromMe: false } }, limit: 60 }),
-          }),
-          evoFetch(`/chat/findMessages/${instanceName}`, {
-            method: 'POST',
-            body: JSON.stringify({ where: { key: { remoteJid: phoneJid, fromMe: true } }, limit: 60 }),
-          }),
-        );
-      }
-
-      const results = await Promise.allSettled(queries);
+            body: JSON.stringify({ where: { key: { remoteJid: jid } }, limit: 60 }),
+          })
+        )
+      );
 
       const extractRecords = (result: PromiseSettledResult<any>): any[] => {
         if (result.status === 'rejected') return [];
