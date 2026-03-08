@@ -490,19 +490,32 @@ A Appmax é uma processadora de pagamentos focada em e-commerce e negócios digi
 
     try {
       const evalPrompt = `
-Você é um coach de vendas especialista. Analise esta simulação de vendas e avalie o vendedor.
+Você é um coach especialista em vendas B2B para fintechs e processadoras de pagamentos, com foco em e-commerce.
+Analise esta simulação de vendas da Appmax (processadora de pagamentos) e avalie o desempenho do vendedor.
 
 CENÁRIO: ${scenario.title}
-FOCO: ${scenario.focusPoints.join(', ')}
-EVITAR: ${scenario.avoidPoints.join(', ')}
+PERSONA DO CLIENTE: ${scenario.persona}
 
-TRANSCRIÇÃO:
-${historyRef.current.map(m => `${m.role === 'user' ? 'VENDEDOR' : 'CLIENTE'}: ${m.content}`).join('\n')}
+O VENDEDOR DEVIA FOCAR EM:
+${scenario.focusPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+O VENDEDOR DEVIA EVITAR:
+${scenario.avoidPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+TRANSCRIÇÃO DA SIMULAÇÃO:
+${historyRef.current.map(m => `${m.role === 'user' ? '🟦 VENDEDOR' : '🟥 CLIENTE'}: ${m.content}`).join('\n')}
+
+Avalie de 0 a 100 o desempenho do vendedor com base em:
+- Levantamento correto de dados da operação do cliente (volume, ticket médio, aprovação atual)
+- Apresentação de valor além da taxa (antifraude, recuperação de vendas, checkout)
+- Tratamento de objeções de forma consultiva
+- Condução da conversa em direção a um próximo passo concreto
+- Evitou os erros listados acima?
 
 Responda em JSON com:
 {
   "score": <número de 0 a 100>,
-  "feedback": "<2-3 frases de feedback construtivo em português>"
+  "feedback": "<feedback específico em 3-4 frases: o que foi bem, o que precisa melhorar e uma dica prática para a próxima simulação>"
 }
 `;
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
