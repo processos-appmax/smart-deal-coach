@@ -20,7 +20,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
 export default function AppTopBar() {
   const { user } = useAuth();
   const location = useLocation();
-  const page = PAGE_TITLES[location.pathname] || { title: 'Deal Intel', subtitle: '' };
+  const page = PAGE_TITLES[location.pathname] || { title: 'Appmax', subtitle: '' };
 
   return (
     <header className="h-14 border-b border-border flex items-center justify-between px-6 gap-4 flex-shrink-0 bg-background/80 backdrop-blur-sm">

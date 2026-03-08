@@ -60,7 +60,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-display font-bold">Deal Intel</span>
+            <span className="text-xl font-display font-bold">Appmax</span>
           </div>
           <div className="mb-10">
             <h1 className="text-4xl font-display font-bold mb-4 leading-tight">
@@ -82,7 +82,7 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="relative z-10 flex items-center gap-6 text-xs text-muted-foreground">
-          <span>© 2024 Deal Intel</span>
+          <span>© 2026 Appmax</span>
           <span>·</span>
           <span>Privacidade</span>
           <span>·</span>
@@ -98,7 +98,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-display font-bold">Deal Intel</span>
+            <span className="text-xl font-display font-bold">Appmax</span>
           </div>
 
           <div className="mb-8">
@@ -192,13 +192,30 @@ export default function LoginPage() {
             </button>
           </p>
 
-          <div className="mt-8 p-3 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground text-center mb-1">
-              <span className="font-medium text-foreground">Acesso demo</span>
+          <div className="mt-8 p-4 rounded-lg bg-primary/5 border border-primary/20">
+            <p className="text-xs font-semibold text-foreground mb-2">
+              🔑 Credenciais de acesso
             </p>
-            <p className="text-xs text-muted-foreground text-center">
-              Use qualquer email/senha ou clique em Google para entrar
-            </p>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-14">Email:</span>
+                <code className="text-xs text-primary font-mono">marcos.schuldz@appmax.com.br</code>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-14">Senha:</span>
+                <code className="text-xs text-primary font-mono">Appmax102030@</code>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="mt-3 w-full text-xs text-center text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+              onClick={() => {
+                setEmail('marcos.schuldz@appmax.com.br');
+                setPassword('Appmax102030@');
+              }}
+            >
+              Preencher automaticamente →
+            </button>
           </div>
         </div>
       </div>

@@ -5,10 +5,10 @@ import { Zap, Plus, Play, Clock, CheckCircle2, XCircle, Settings2, Brain, Messag
 import { cn } from '@/lib/utils';
 
 const AUTOMATIONS = [
-  { id: 'auto_001', name: 'Análise pós-reunião via IA', trigger: 'Reunião concluída', action: 'OpenAI → Scorecard automático', status: 'active', lastRun: '2024-11-24T16:00:00', runs: 42 },
-  { id: 'auto_002', name: 'Notificação no-show', trigger: 'Reunião marcada como no-show', action: 'WhatsApp → Follow-up automático', status: 'active', lastRun: '2024-11-23T10:00:00', runs: 8 },
-  { id: 'auto_003', name: 'Qualificação WhatsApp → HubSpot', trigger: 'Conversa com score > 80', action: 'Criar deal no HubSpot', status: 'paused', lastRun: '2024-11-20T14:00:00', runs: 15 },
-  { id: 'auto_004', name: 'Relatório semanal por email', trigger: 'Toda segunda-feira 08:00', action: 'Gerar PDF → Enviar por email', status: 'active', lastRun: '2024-11-18T08:00:00', runs: 6 },
+  { id: 'auto_001', name: 'Análise pós-reunião via IA', trigger: 'Reunião concluída', action: 'OpenAI → Scorecard automático', status: 'active', lastRun: '2026-03-08T16:00:00', runs: 42 },
+  { id: 'auto_002', name: 'Notificação no-show', trigger: 'Reunião marcada como no-show', action: 'WhatsApp → Follow-up automático', status: 'active', lastRun: '2026-03-07T10:00:00', runs: 8 },
+  { id: 'auto_003', name: 'Qualificação WhatsApp → HubSpot', trigger: 'Conversa com score > 80', action: 'Criar deal no HubSpot', status: 'paused', lastRun: '2026-03-04T14:00:00', runs: 15 },
+  { id: 'auto_004', name: 'Relatório semanal por email', trigger: 'Toda segunda-feira 08:00', action: 'Gerar PDF → Enviar por email', status: 'active', lastRun: '2026-03-02T08:00:00', runs: 6 },
 ];
 
 const WEBHOOK_EVENTS = [

@@ -17,13 +17,19 @@ const AuthContext = createContext<AuthContextType | null>(null);
 // Mock user for demo
 const MOCK_USER: User = {
   id: 'usr_admin_001',
-  name: 'Carlos Mendes',
-  email: 'admin@dealintel.com.br',
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Carlos',
+  name: 'Marcos Schuldz',
+  email: 'marcos.schuldz@appmax.com.br',
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marcos',
   role: 'admin',
-  company: 'Deal Intel',
+  company: 'Appmax',
   status: 'active',
-  createdAt: '2024-01-01',
+  createdAt: '2026-01-01',
+};
+
+// Valid demo credentials
+const DEMO_CREDENTIALS = {
+  email: 'marcos.schuldz@appmax.com.br',
+  password: 'Appmax102030@',
 };
 
 const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
@@ -39,24 +45,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check for stored session
-    const stored = localStorage.getItem('dealintel_user');
+    const stored = localStorage.getItem('appmax_user');
     if (stored) {
       try {
         setUser(JSON.parse(stored));
       } catch {
-        localStorage.removeItem('dealintel_user');
+        localStorage.removeItem('appmax_user');
       }
     }
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, _password: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(r => setTimeout(r, 800));
-    const mockUser = { ...MOCK_USER, email };
+    await new Promise(r => setTimeout(r, 600));
+    // Check exact credentials OR allow any email (demo mode)
+    const isValidCredentials =
+      (email === DEMO_CREDENTIALS.email && password === DEMO_CREDENTIALS.password) ||
+      (email.length > 0 && password.length > 0);
+    if (!isValidCredentials) {
+      setIsLoading(false);
+      throw new Error('Credenciais inválidas');
+    }
+    const mockUser = email === DEMO_CREDENTIALS.email
+      ? { ...MOCK_USER }
+      : { ...MOCK_USER, email };
     setUser(mockUser);
-    localStorage.setItem('dealintel_user', JSON.stringify(mockUser));
+    localStorage.setItem('appmax_user', JSON.stringify(mockUser));
     setIsLoading(false);
   };
 
@@ -64,13 +79,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     await new Promise(r => setTimeout(r, 600));
     setUser(MOCK_USER);
-    localStorage.setItem('dealintel_user', JSON.stringify(MOCK_USER));
+    localStorage.setItem('appmax_user', JSON.stringify(MOCK_USER));
     setIsLoading(false);
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('dealintel_user');
+    localStorage.removeItem('appmax_user');
   };
 
   const hasRole = (roles: UserRole[]) => {

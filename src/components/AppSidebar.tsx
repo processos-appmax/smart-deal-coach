@@ -74,7 +74,7 @@ export default function AppSidebar({ collapsed, onToggle }: { collapsed: boolean
         </div>
         {!collapsed && (
           <div>
-            <span className="font-display font-bold text-foreground text-sm">Deal Intel</span>
+            <span className="font-display font-bold text-foreground text-sm">Appmax</span>
             <div className="flex items-center gap-1 mt-0.5">
               <span className="text-[10px] text-muted-foreground">Revenue Intelligence</span>
             </div>
