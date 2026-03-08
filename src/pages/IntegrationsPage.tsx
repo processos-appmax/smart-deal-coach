@@ -327,7 +327,7 @@ function EvolutionPanel() {
                     <label className="text-[10px] text-muted-foreground block mb-1">Atribuir a usuário</label>
                     <select
                       value={assignedUserId || ''}
-                      onChange={e => setInstanceUserMap(m => ({ ...m, [name]: e.target.value }))}
+                      onChange={e => handleAssignUser(name, e.target.value)}
                       className="w-full h-7 text-[10px] bg-secondary border border-border rounded-lg px-2 text-foreground"
                     >
                       <option value="">— Sem atribuição —</option>
@@ -338,27 +338,19 @@ function EvolutionPanel() {
                   </div>
                 )}
 
-                <div className="flex gap-1.5">
-                  {!isOpen ? (
+                {/* QR to connect — never disconnect/delete */}
+                {!isOpen && (
+                  <div className="flex gap-1.5">
                     <Button
                       size="sm"
                       className="flex-1 text-[10px] h-6 bg-gradient-primary"
                       onClick={e => { e.stopPropagation(); handleGetQr(name); }}
-                      disabled={loadingQr}
+                      disabled={loadingQr && qrInstanceName === name}
                     >
-                      <QrCode className="w-3 h-3 mr-1" /> {loadingQr ? 'Aguarde...' : 'Conectar / QR'}
+                      <QrCode className="w-3 h-3 mr-1" /> {loadingQr && qrInstanceName === name ? 'Aguarde...' : 'Conectar / QR'}
                     </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 text-[10px] h-6 border-destructive/30 text-destructive hover:bg-destructive/10"
-                      onClick={e => { e.stopPropagation(); handleDisconnect(name); }}
-                    >
-                      <WifiOff className="w-3 h-3 mr-1" /> Desconectar
-                    </Button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             );
           })}
