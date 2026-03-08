@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { MOCK_USERS } from '@/data/mockData';
+import { MOCK_USERS, MOCK_WHATSAPP_INSTANCES } from '@/data/mockData';
 import type { User, UserRole } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Plus, Search, Mail, MoreHorizontal, Trash2, UserX, UserCheck,
-  UserPlus, Eye, EyeOff, Shield, SlidersHorizontal, AlertTriangle
+  UserPlus, Eye, EyeOff, Shield, SlidersHorizontal, AlertTriangle,
+  Smartphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +19,14 @@ import { useAppConfig, DEFAULT_MODULES, type ModuleId } from '@/contexts/AppConf
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
+
+// In-memory store for userId → instanceId mapping (shared with IntegrationsPage via localStorage key)
+const getInstanceForUser = (userId: string) =>
+  localStorage.getItem(`wa_instance_${userId}`) || '';
+const setInstanceForUser = (userId: string, instanceId: string) => {
+  if (instanceId) localStorage.setItem(`wa_instance_${userId}`, instanceId);
+  else localStorage.removeItem(`wa_instance_${userId}`);
+};
 
 const ROLE_CONFIG: Record<UserRole, { label: string; class: string }> = {
   admin:      { label: 'Admin',      class: 'bg-destructive/10 text-destructive border-destructive/20' },
@@ -185,6 +194,7 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
   const { getUserDisabledModules, setUserModuleOverride, modules } = useAppConfig();
   const { toast } = useToast();
   const [disabled, setDisabled] = useState<ModuleId[]>(getUserDisabledModules(user.id));
+  const [selectedInstance, setSelectedInstance] = useState(() => getInstanceForUser(user.id));
 
   const toggle = (id: ModuleId) => {
     setDisabled(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
@@ -192,9 +202,12 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
 
   const globallyDisabled = new Set(modules.filter(m => !m.enabled).map(m => m.id));
 
+  const assignedInst = MOCK_WHATSAPP_INSTANCES.find(i => i.id === selectedInstance);
+
   const save = () => {
     setUserModuleOverride(user.id, disabled);
-    toast({ title: 'Permissões salvas', description: `Módulos de ${user.name} atualizados.` });
+    setInstanceForUser(user.id, selectedInstance);
+    toast({ title: 'Perfil salvo', description: `Configurações de ${user.name} atualizadas.` });
     onClose();
   };
 
@@ -203,7 +216,7 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
       <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-primary" /> Módulos Visíveis — {user.name}
+            <SlidersHorizontal className="w-4 h-4 text-primary" /> Perfil & Permissões — {user.name}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-1">
@@ -217,9 +230,43 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
               {ROLE_CONFIG[user.role].label}
             </span>
           </div>
+
+          {/* WhatsApp instance assignment */}
+          <div className="p-3 rounded-xl border border-border space-y-2">
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-accent" />
+              <label className="text-xs font-semibold">Instância WhatsApp</label>
+            </div>
+            <Select value={selectedInstance} onValueChange={setSelectedInstance}>
+              <SelectTrigger className="h-9 text-xs bg-secondary border-border"><SelectValue placeholder="Selecionar instância..." /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="" className="text-xs text-muted-foreground">— Sem instância —</SelectItem>
+                {MOCK_WHATSAPP_INSTANCES.map(inst => (
+                  <SelectItem key={inst.id} value={inst.id} className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('w-1.5 h-1.5 rounded-full', inst.status === 'connected' ? 'bg-success' : 'bg-muted-foreground')} />
+                      {inst.name}
+                      {inst.phone && <span className="text-muted-foreground font-mono ml-1">{inst.phone}</span>}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {assignedInst && (
+              <div className={cn('flex items-center gap-2 text-[10px] px-2 py-1 rounded-lg border',
+                assignedInst.status === 'connected' ? 'bg-success/5 border-success/20 text-success' : 'bg-muted/30 border-border text-muted-foreground')}>
+                <Smartphone className="w-3 h-3" />
+                {assignedInst.phone || assignedInst.name}
+                <span className={cn('ml-auto font-medium', assignedInst.status === 'connected' ? 'text-success' : 'text-muted-foreground')}>
+                  {assignedInst.status === 'connected' ? '● Conectado' : '○ Desconectado'}
+                </span>
+              </div>
+            )}
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold">Módulos visíveis para este usuário</label>
+              <label className="text-xs font-semibold">Módulos visíveis</label>
               <span className="text-[10px] text-muted-foreground">{DEFAULT_MODULES.length - disabled.length} de {DEFAULT_MODULES.length} ativos</span>
             </div>
             <div className="space-y-1.5">
@@ -344,6 +391,7 @@ export default function UsersPage() {
             <tr>
               <th className="text-left">Usuário</th>
               <th className="text-left hidden md:table-cell">Email</th>
+              <th className="text-center hidden xl:table-cell">WhatsApp</th>
               <th className="text-center">Perfil</th>
               <th className="text-center">Status</th>
               <th className="text-center hidden lg:table-cell">Desde</th>
@@ -354,6 +402,8 @@ export default function UsersPage() {
             {filtered.map(u => {
               const rc = ROLE_CONFIG[u.role];
               const isSelf = u.id === currentUser?.id;
+              const instId = getInstanceForUser(u.id);
+              const assignedInst = MOCK_WHATSAPP_INSTANCES.find(i => i.id === instId);
               return (
                 <tr key={u.id} className={cn(u.status === 'inactive' && 'opacity-60')}>
                   <td>
@@ -372,6 +422,16 @@ export default function UsersPage() {
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <Mail className="w-3.5 h-3.5" /> {u.email}
                     </div>
+                  </td>
+                  <td className="hidden xl:table-cell text-center">
+                    {assignedInst ? (
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', assignedInst.status === 'connected' ? 'bg-success' : 'bg-muted-foreground')} />
+                        <span className="text-[10px] text-muted-foreground font-mono">{assignedInst.phone || assignedInst.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground/40">—</span>
+                    )}
                   </td>
                   <td className="text-center">
                     <span className={cn('text-xs px-2.5 py-0.5 rounded-full border font-medium', rc.class)}>{rc.label}</span>
