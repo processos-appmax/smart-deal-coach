@@ -365,7 +365,7 @@ export default function WhatsAppPage() {
   // Poll chat list every 10s to update unread counts and new conversations
   useEffect(() => {
     if (!activeInstance || activeInstance.connectionStatus !== 'open') return;
-    const t = setInterval(() => loadChats(activeInstance.name, true), 10000);
+    const t = setInterval(() => loadChats(activeInstance.name, true), 3000);
     return () => clearInterval(t);
   }, [activeInstance?.name, activeInstance?.connectionStatus]);
 
@@ -581,7 +581,7 @@ export default function WhatsAppPage() {
             </p>
             {activeInstance && isConnected && (
               <button
-                onClick={() => loadChats(activeInstance.name)}
+                onClick={() => loadChats(activeInstance.name, true)}
                 className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
                 <RefreshCw className="w-3 h-3" />
               </button>
