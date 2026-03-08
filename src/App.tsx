@@ -67,12 +67,14 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AppConfigProvider>
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPageWrapper />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
         </AuthProvider>
+        </AppConfigProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
