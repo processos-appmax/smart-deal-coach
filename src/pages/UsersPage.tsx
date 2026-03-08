@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { MOCK_USERS } from '@/data/mockData';
+import { MOCK_USERS, MOCK_WHATSAPP_INSTANCES } from '@/data/mockData';
 import type { User, UserRole } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Plus, Search, Mail, MoreHorizontal, Trash2, UserX, UserCheck,
-  UserPlus, Eye, EyeOff, Shield, SlidersHorizontal, AlertTriangle
+  UserPlus, Eye, EyeOff, Shield, SlidersHorizontal, AlertTriangle,
+  Smartphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +19,14 @@ import { useAppConfig, DEFAULT_MODULES, type ModuleId } from '@/contexts/AppConf
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
+
+// In-memory store for userId → instanceId mapping (shared with IntegrationsPage via localStorage key)
+const getInstanceForUser = (userId: string) =>
+  localStorage.getItem(`wa_instance_${userId}`) || '';
+const setInstanceForUser = (userId: string, instanceId: string) => {
+  if (instanceId) localStorage.setItem(`wa_instance_${userId}`, instanceId);
+  else localStorage.removeItem(`wa_instance_${userId}`);
+};
 
 const ROLE_CONFIG: Record<UserRole, { label: string; class: string }> = {
   admin:      { label: 'Admin',      class: 'bg-destructive/10 text-destructive border-destructive/20' },
