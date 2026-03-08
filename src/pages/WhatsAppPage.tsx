@@ -369,14 +369,43 @@ export default function WhatsAppPage() {
     try {
       const data = await evoFetch(`/chat/findChats/${instanceName}`, { method: 'POST', body: JSON.stringify({}) });
       const raw: any[] = Array.isArray(data) ? data : (data?.chats || []);
-      setChats(raw.slice(0, 80).map((c: any) => ({
-        id: c.id || c.remoteJid,
-        remoteJid: c.remoteJid || c.id || '',
-        name: c.name || c.pushName || c.remoteJid?.replace(/@.*/, '') || 'Desconhecido',
-        lastMessage: c.lastMessage?.message?.conversation || c.lastMessage?.message?.extendedTextMessage?.text || '',
-        lastMessageTs: c.lastMessage?.messageTimestamp || (c.updatedAt ? Math.floor(new Date(c.updatedAt).getTime() / 1000) : 0),
-        unread: c.unreadCount || 0,
-      })));
+
+      // Helper: resolve the real phone number from a JID
+      // @lid JIDs are internal Evolution IDs — the real phone comes from remoteJidAlt in lastMessage
+      const resolvePhone = (c: any): string => {
+        const jid: string = c.remoteJid || '';
+        if (!jid.includes('@lid')) return jid.replace(/@.*/, '');
+        // Try to extract real phone from lastMessage keys
+        const alt: string =
+          c.lastMessage?.key?.remoteJidAlt ||
+          c.lastMessage?.key?.participantAlt ||
+          '';
+        return alt ? alt.replace(/@.*/, '') : jid.replace(/@.*/, '');
+      };
+
+      // Build chats and deduplicate: if two entries resolve to the same phone, keep latest
+      const phoneMap = new Map<string, Chat>();
+      for (const c of raw) {
+        const phone = resolvePhone(c);
+        const ts = c.lastMessage?.messageTimestamp ||
+          (c.updatedAt ? Math.floor(new Date(c.updatedAt).getTime() / 1000) : 0);
+        const existing = phoneMap.get(phone);
+        if (!existing || ts > existing.lastMessageTs) {
+          phoneMap.set(phone, {
+            id: c.id || c.remoteJid,
+            remoteJid: c.remoteJid || c.id || '',
+            name: c.name || c.pushName || c.lastMessage?.key?.pushName || phone || 'Desconhecido',
+            lastMessage:
+              c.lastMessage?.message?.conversation ||
+              c.lastMessage?.message?.extendedTextMessage?.text ||
+              '',
+            lastMessageTs: ts,
+            unread: c.unreadCount || 0,
+          });
+        }
+      }
+
+      setChats(Array.from(phoneMap.values()).slice(0, 80));
     } catch { setChats([]); }
     finally { setLoadingChats(false); }
   };
