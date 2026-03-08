@@ -254,10 +254,15 @@ export default function WhatsAppPage() {
           c.lastMessage?.messageTimestamp ||
           (c.updatedAt ? Math.floor(new Date(c.updatedAt).getTime() / 1000) : 0);
         const existing = phoneMap.get(phone);
+        // Extract the real phone JID (remoteJidAlt) for @lid conversations
+        const remoteJidAlt =
+          c.lastMessage?.key?.remoteJidAlt ||
+          (phone ? `${phone}@s.whatsapp.net` : undefined);
         if (!existing || ts > existing.lastMessageTs) {
           phoneMap.set(phone, {
             id: c.id || c.remoteJid,
             remoteJid: c.remoteJid || c.id || '',
+            remoteJidAlt,
             phone,
             name: c.name || c.pushName || c.lastMessage?.pushName || phone || 'Desconhecido',
             lastMessage:
