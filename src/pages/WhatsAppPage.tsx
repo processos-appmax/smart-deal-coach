@@ -307,30 +307,48 @@ export default function WhatsAppPage() {
   const loadMessages = useCallback(async (instanceName: string, remoteJid: string, scroll = false) => {
     if (scroll) setLoadingMsgs(true);
     try {
-      const data = await evoFetch(`/chat/findMessages/${instanceName}`, {
-        method: 'POST',
-        body: JSON.stringify({ where: { key: { remoteJid } }, limit: 60 }),
-      });
-      const raw: any[] = Array.isArray(data?.messages?.records)
-        ? data.messages.records
-        : Array.isArray(data) ? data : [];
+      // Fetch both directions in parallel: received (fromMe:false) and sent (fromMe:true)
+      const [dataReceived, dataSent] = await Promise.allSettled([
+        evoFetch(`/chat/findMessages/${instanceName}`, {
+          method: 'POST',
+          body: JSON.stringify({ where: { key: { remoteJid, fromMe: false } }, limit: 60 }),
+        }),
+        evoFetch(`/chat/findMessages/${instanceName}`, {
+          method: 'POST',
+          body: JSON.stringify({ where: { key: { remoteJid, fromMe: true } }, limit: 60 }),
+        }),
+      ]);
 
+      const extractRecords = (result: PromiseSettledResult<any>): any[] => {
+        if (result.status === 'rejected') return [];
+        const data = result.value;
+        return Array.isArray(data?.messages?.records)
+          ? data.messages.records
+          : Array.isArray(data) ? data : [];
+      };
+
+      const rawReceived = extractRecords(dataReceived);
+      const rawSent = extractRecords(dataSent);
+      const raw = [...rawReceived, ...rawSent];
+
+      // Deduplicate by message key id
+      const seen = new Set<string>();
       const parsed: Message[] = raw
         .filter((m: any) => {
-          // Ignore protocol/reaction system messages
           if (m.messageType === 'protocolMessage' || m.messageType === 'reactionMessage') return false;
-          // Accept all messages returned by the query — both fromMe and received
+          const msgId = m.key?.id || m.id;
+          if (seen.has(msgId)) return false;
+          seen.add(msgId);
           return true;
         })
         .map((m: any) => ({
-          id: m.id || m.key?.id || `${m.messageTimestamp}_${Math.random()}`,
+          id: m.key?.id || m.id || `${m.messageTimestamp}_${Math.random()}`,
           fromMe: m.key?.fromMe === true,
           body: parseBody(m),
           timestamp: m.messageTimestamp || 0,
         }))
         .sort((a, b) => a.timestamp - b.timestamp);
 
-      // Always update — force re-render on manual refresh too
       setMessages(parsed);
     } catch { /* silent */ }
     finally { if (scroll) setLoadingMsgs(false); }
