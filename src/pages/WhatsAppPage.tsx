@@ -215,30 +215,6 @@ export default function WhatsAppPage() {
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
 
   // resolvePhone: for @lid JIDs, use the @lid number itself as the unique identifier.
-  // resolvePhone: extracts the numeric identifier from the JID for deduplication purposes only.
-  // For @lid JIDs this will be the LID number (used as map key only, not displayed).
-  const resolvePhone = (c: any): string => {
-    const jid: string = c.remoteJid || '';
-    return jid.replace(/@.*/, '');
-  };
-
-  // getRealPhone: returns the real phone number to display.
-  // For @lid chats, the real phone is in lastMessage.key.remoteJidAlt (e.g. "554298224190@s.whatsapp.net")
-  const getRealPhone = (c: any): string => {
-    const jid: string = c.remoteJid || '';
-    // @s.whatsapp.net — the number itself IS the phone
-    if (!jid.includes('@lid')) return jid.replace(/@.*/, '');
-    // @lid — look for real phone in lastMessage.key.remoteJidAlt
-    const alt: string = c.lastMessage?.key?.remoteJidAlt || '';
-    if (alt) return alt.replace(/@.*/, '');
-    // fallback: direct fields
-    if (c.phone) return String(c.phone).replace(/\D/g, '');
-    if (c.number) return String(c.number).replace(/\D/g, '');
-    // last resort: return the LID number (ugly but better than nothing)
-    return jid.replace(/@.*/, '');
-  };
-
-
   const parseBody = (m: any): string => {
     const msg = m.message || {};
     return (
@@ -254,6 +230,17 @@ export default function WhatsAppPage() {
     );
   };
 
+  // For @lid chats, the real phone number is in lastMessage.key.remoteJidAlt.
+  // We use it as the dedup key so @lid and @s.whatsapp.net entries merge into one chat.
+  const getDedupeKey = (c: any): string => {
+    const jid: string = c.remoteJid || '';
+    if (jid.includes('@lid')) {
+      const alt: string = c.lastMessage?.key?.remoteJidAlt || '';
+      if (alt) return alt.replace(/@.*/, ''); // real phone → same key as @s.whatsapp.net entry
+    }
+    return jid.replace(/@.*/, '');
+  };
+
   const loadChats = useCallback(async (instanceName: string, silent = false) => {
     if (!silent) {
       setLoadingChats(true);
@@ -266,81 +253,78 @@ export default function WhatsAppPage() {
       });
       const raw: any[] = Array.isArray(data) ? data : (data?.chats || []);
 
+      // Key = real phone number (same for both @lid and @s.whatsapp.net of same contact)
       const phoneMap = new Map<string, Chat>();
+
       for (const c of raw) {
-        const phone = resolvePhone(c);
-        if (!phone) continue;
+        const key = getDedupeKey(c);
+        if (!key) continue;
+
+        const jid: string = c.remoteJid || c.id || '';
+        const isLid = jid.includes('@lid');
         const ts =
           c.lastMessage?.messageTimestamp ||
           (c.updatedAt ? Math.floor(new Date(c.updatedAt).getTime() / 1000) : 0);
 
-        const jid: string = c.remoteJid || c.id || '';
-        const isLid = jid.includes('@lid');
+        // Real phone: for @lid use remoteJidAlt number, for @s.whatsapp.net use jid number
+        const realPhone = isLid
+          ? (c.lastMessage?.key?.remoteJidAlt || '').replace(/@.*/, '') || key
+          : jid.replace(/@.*/, '');
 
-        // Real phone to display: use getRealPhone which prefers @s.whatsapp.net or API fields
-        const realPhone = getRealPhone(c);
+        const name = c.name || c.pushName || c.lastMessage?.pushName || '';
+        const lastMsg =
+          c.lastMessage?.message?.conversation ||
+          c.lastMessage?.message?.extendedTextMessage?.text || '';
 
-        const existing = phoneMap.get(phone);
+        const existing = phoneMap.get(key);
 
         if (!existing) {
-          phoneMap.set(phone, {
+          phoneMap.set(key, {
             id: jid,
             remoteJid: jid,
             remoteJidAlt: undefined,
-            phone: realPhone || phone, // use real phone if available, else LID number as fallback
-            name: c.name || c.pushName || c.lastMessage?.pushName || realPhone || phone || 'Desconhecido',
-            lastMessage:
-              c.lastMessage?.message?.conversation ||
-              c.lastMessage?.message?.extendedTextMessage?.text ||
-              '',
+            phone: realPhone,
+            name: name || realPhone || key,
+            lastMessage: lastMsg,
             lastMessageTs: ts,
             unread: c.unreadCount || 0,
           });
         } else {
-          // Merge: always prefer @lid as the primary remoteJid
+          // Merge — always prefer @lid as primary (has received msgs), phone JID as alt (has sent msgs)
           const existingIsLid = existing.remoteJid.includes('@lid');
-          const mergedEntry: Chat = {
+          const betterName = name || existing.name;
+          const betterTs = Math.max(ts, existing.lastMessageTs);
+          const betterMsg = ts >= existing.lastMessageTs ? (lastMsg || existing.lastMessage) : existing.lastMessage;
+
+          const merged: Chat = {
             ...existing,
-            // Update name/message/ts if newer
-            name: (c.name || c.pushName || c.lastMessage?.pushName || existing.name),
-            lastMessage: ts > existing.lastMessageTs
-              ? (c.lastMessage?.message?.conversation || c.lastMessage?.message?.extendedTextMessage?.text || existing.lastMessage)
-              : existing.lastMessage,
-            lastMessageTs: Math.max(ts, existing.lastMessageTs),
+            name: betterName || existing.phone,
+            lastMessage: betterMsg,
+            lastMessageTs: betterTs,
             unread: Math.max(c.unreadCount || 0, existing.unread),
+            phone: realPhone || existing.phone,
           };
 
           if (isLid && !existingIsLid) {
-            // New entry is @lid — upgrade primary JID to @lid, keep phone JID as alt
-            mergedEntry.remoteJid = jid;
-            mergedEntry.id = jid;
-            mergedEntry.remoteJidAlt = existing.remoteJid;
-            // existing.phone already has the real phone number (from @s.whatsapp.net)
-            mergedEntry.phone = existing.phone;
+            merged.id = jid;
+            merged.remoteJid = jid;               // @lid = primary
+            merged.remoteJidAlt = existing.remoteJid; // @s.whatsapp.net = alt (sent msgs)
           } else if (!isLid && existingIsLid) {
-            // Existing is @lid — store new phone JID as alt, update phone to real number from @s.whatsapp.net
-            mergedEntry.remoteJidAlt = jid;
-            mergedEntry.phone = realPhone || phone; // phone from @s.whatsapp.net is always real
+            merged.remoteJidAlt = jid;             // @s.whatsapp.net = alt (sent msgs)
           }
-          phoneMap.set(phone, mergedEntry);
+
+          phoneMap.set(key, merged);
         }
       }
-      // Sort by latest message
+
       const sorted = Array.from(phoneMap.values()).sort((a, b) => b.lastMessageTs - a.lastMessageTs);
+
       if (silent) {
-        // On silent poll: merge unread counts but keep 0 for the active chat
         setChats(prev => {
           const prevMap = new Map(prev.map(c => [c.id, c]));
           return sorted.map(newChat => {
-            const existing = prevMap.get(newChat.id);
-            // If this chat is currently open, keep unread = 0
             const isOpen = activeChatRef.current?.id === newChat.id;
-            return {
-              ...newChat,
-              unread: isOpen ? 0 : newChat.unread,
-              // If we had previously zeroed a badge by clicking, don't re-show unless there's actually new unread
-              ...(existing && existing.unread === 0 && newChat.unread === 0 ? {} : {}),
-            };
+            return { ...newChat, unread: isOpen ? 0 : newChat.unread };
           });
         });
       } else {
