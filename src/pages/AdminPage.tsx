@@ -13,13 +13,11 @@ import { useAppConfig, DEFAULT_MODULES, type ModuleId } from '@/contexts/AppConf
 import { useToast } from '@/hooks/use-toast';
 
 const ADMIN_SECTIONS = [
-  { id: 'company',      label: 'Empresa',              icon: Building2 },
-  { id: 'users',        label: 'Usuários & Permissões', icon: Users },
-  { id: 'api-keys',     label: 'Tokens OpenAI',         icon: Key },
-  { id: 'modules',      label: 'Módulos Visíveis',      icon: ToggleRight },
-  { id: 'security',     label: 'Segurança & RLS',       icon: Lock },
-  { id: 'notifications',label: 'Notificações',          icon: Bell },
-  { id: 'billing',      label: 'Plano & Faturamento',   icon: TrendingUp },
+  { id: 'company',  label: 'Empresa',              icon: Building2 },
+  { id: 'users',    label: 'Usuários & Permissões', icon: Users },
+  { id: 'api-keys', label: 'Tokens OpenAI',         icon: Key },
+  { id: 'modules',  label: 'Módulos Visíveis',      icon: ToggleRight },
+  { id: 'security', label: 'Segurança & RLS',       icon: Lock },
 ];
 
 const TOKEN_FIELDS: { key: keyof import('@/contexts/AppConfigContext').OpenAITokens; label: string; desc: string; icon: string }[] = [
