@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { MOCK_USERS } from '@/data/mockData';
+import { MOCK_USERS, MOCK_TEAMS } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Shield, Users, Plug2, Bell, Building2, Key,
   ChevronRight, CheckCircle2, AlertCircle, Save, Eye, EyeOff,
-  TrendingUp, Lock, ToggleLeft, ToggleRight
+  TrendingUp, Lock, ToggleLeft, ToggleRight, SlidersHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAppConfig, type ModuleId } from '@/contexts/AppConfigContext';
+import { useAppConfig, DEFAULT_MODULES, type ModuleId } from '@/contexts/AppConfigContext';
 import { useToast } from '@/hooks/use-toast';
 
 const ADMIN_SECTIONS = [
@@ -33,7 +33,9 @@ const TOKEN_FIELDS: { key: keyof import('@/contexts/AppConfigContext').OpenAITok
 export default function AdminPage() {
   const [section, setSection] = useState('company');
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
-  const { tokens, setToken, modules, setModuleEnabled, saveConfig } = useAppConfig();
+  const [moduleTarget, setModuleTarget] = useState<'global' | string>('global'); // 'global' | userId | teamId
+  const { tokens, setToken, modules, setModuleEnabled, saveConfig,
+          getUserDisabledModules, setUserModuleOverride } = useAppConfig();
   const { toast } = useToast();
 
   const toggleKey = (k: string) => setShowKey(prev => ({ ...prev, [k]: !prev[k] }));
@@ -43,8 +45,20 @@ export default function AdminPage() {
     toast({ title: 'Tokens salvos', description: 'Configurações de API atualizadas com sucesso.' });
   };
 
-  // Modules that should always stay visible (admin cannot disable admin itself)
   const isLocked = (id: ModuleId) => id === 'admin';
+
+  // For per-user/team module overrides
+  const targetDisabled = moduleTarget === 'global' ? [] : getUserDisabledModules(moduleTarget);
+  const toggleTargetModule = (id: ModuleId) => {
+    if (moduleTarget === 'global') {
+      setModuleEnabled(id, !!modules.find(m => m.id === id && !m.enabled));
+      return;
+    }
+    const cur = getUserDisabledModules(moduleTarget);
+    const next = cur.includes(id) ? cur.filter(m => m !== id) : [...cur, id];
+    setUserModuleOverride(moduleTarget, next);
+    toast({ title: 'Salvo', description: 'Permissões de módulo atualizadas.' });
+  };
 
   return (
     <div className="page-container animate-fade-in">
@@ -190,48 +204,119 @@ export default function AdminPage() {
               <div>
                 <h2 className="font-display font-semibold text-lg">Módulos Visíveis</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Controle quais seções aparecem no menu lateral para todos os usuários.
+                  Configure quais módulos aparecem no menu para cada usuário ou time.
                 </p>
               </div>
+
+              {/* Target selector */}
               <div className="space-y-2">
-                {modules.map(mod => (
-                  <div
-                    key={mod.id}
-                    className={cn(
-                      'flex items-center justify-between p-3 rounded-xl border transition-colors',
-                      mod.enabled ? 'bg-muted/30 border-border/50' : 'bg-muted/10 border-border/20 opacity-60'
-                    )}
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Configurar para:</label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setModuleTarget('global')}
+                    className={cn('text-xs px-3 py-1.5 rounded-lg border transition-all',
+                      moduleTarget === 'global'
+                        ? 'bg-primary/15 border-primary/30 text-primary font-medium'
+                        : 'border-border text-muted-foreground hover:bg-muted')}
                   >
-                    <div className="flex items-center gap-2">
-                      {mod.enabled
-                        ? <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
-                        : <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      }
-                      <div>
-                        <p className="text-sm font-medium">{mod.label}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">/{mod.id}</p>
-                      </div>
-                    </div>
+                    🌐 Global (padrão)
+                  </button>
+                  {MOCK_TEAMS.map(t => (
                     <button
-                      disabled={isLocked(mod.id)}
-                      onClick={() => setModuleEnabled(mod.id, !mod.enabled)}
-                      className={cn(
-                        'transition-colors',
-                        isLocked(mod.id) ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'
-                      )}
-                      title={isLocked(mod.id) ? 'Este módulo não pode ser desativado' : undefined}
+                      key={t.id}
+                      onClick={() => setModuleTarget(t.id)}
+                      className={cn('text-xs px-3 py-1.5 rounded-lg border transition-all',
+                        moduleTarget === t.id
+                          ? 'bg-accent/15 border-accent/30 text-accent font-medium'
+                          : 'border-border text-muted-foreground hover:bg-muted')}
                     >
-                      {mod.enabled
-                        ? <ToggleRight className="w-8 h-8 text-primary" />
-                        : <ToggleLeft  className="w-8 h-8 text-muted-foreground" />
-                      }
+                      👥 {t.name}
                     </button>
+                  ))}
+                  {MOCK_USERS.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => setModuleTarget(u.id)}
+                      className={cn('flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-all',
+                        moduleTarget === u.id
+                          ? 'bg-success/10 border-success/30 text-success font-medium'
+                          : 'border-border text-muted-foreground hover:bg-muted')}
+                    >
+                      <img src={u.avatar} alt={u.name} className="w-4 h-4 rounded-full" />
+                      {u.name.split(' ')[0]}
+                    </button>
+                  ))}
+                </div>
+                {moduleTarget !== 'global' && (
+                  <div className="p-2.5 rounded-lg bg-accent/5 border border-accent/20 text-xs text-muted-foreground">
+                    ℹ️ Módulos desativados globalmente não podem ser reativados aqui. As permissões individuais se somam às globais.
                   </div>
-                ))}
+                )}
+              </div>
+
+              {/* Module toggles */}
+              <div className="space-y-2">
+                {DEFAULT_MODULES.map(mod => {
+                  const globallyOff = !modules.find(m => m.id === mod.id)?.enabled;
+                  const userOff = moduleTarget !== 'global'
+                    ? getUserDisabledModules(moduleTarget).includes(mod.id)
+                    : false;
+                  const isOn = moduleTarget === 'global'
+                    ? !globallyOff
+                    : !globallyOff && !userOff;
+
+                  return (
+                    <div
+                      key={mod.id}
+                      className={cn(
+                        'flex items-center justify-between p-3 rounded-xl border transition-colors',
+                        isOn ? 'bg-muted/30 border-border/50' : 'bg-muted/10 border-border/20 opacity-60'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        {isOn
+                          ? <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                          : <AlertCircle  className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        }
+                        <div>
+                          <p className="text-sm font-medium">{mod.label}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono">/{mod.id}</p>
+                        </div>
+                        {moduleTarget !== 'global' && globallyOff && (
+                          <span className="text-[9px] text-muted-foreground ml-1">(desativado globalmente)</span>
+                        )}
+                      </div>
+                      <button
+                        disabled={isLocked(mod.id) || (moduleTarget !== 'global' && globallyOff)}
+                        onClick={() => {
+                          if (moduleTarget === 'global') {
+                            setModuleEnabled(mod.id, !modules.find(m => m.id === mod.id)?.enabled);
+                          } else {
+                            const cur = getUserDisabledModules(moduleTarget);
+                            const next = cur.includes(mod.id) ? cur.filter(m => m !== mod.id) : [...cur, mod.id];
+                            setUserModuleOverride(moduleTarget, next);
+                          }
+                        }}
+                        className={cn(
+                          'transition-colors',
+                          (isLocked(mod.id) || (moduleTarget !== 'global' && globallyOff))
+                            ? 'opacity-30 cursor-not-allowed'
+                            : 'cursor-pointer'
+                        )}
+                        title={isLocked(mod.id) ? 'Este módulo não pode ser desativado' : undefined}
+                      >
+                        {isOn
+                          ? <ToggleRight className="w-8 h-8 text-primary" />
+                          : <ToggleLeft  className="w-8 h-8 text-muted-foreground" />
+                        }
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
               <div className="p-3 rounded-lg bg-warning/5 border border-warning/20">
                 <p className="text-xs text-muted-foreground">
-                  ⚠️ Ao desativar um módulo ele fica oculto no menu, mas o acesso direto pela URL ainda é possível. Para bloqueio total, use as permissões de role.
+                  ⚠️ Módulos desativados ficam ocultos no menu lateral. Para bloqueio total de URL, use as permissões de role.
                 </p>
               </div>
             </div>

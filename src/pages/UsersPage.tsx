@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { MOCK_USERS } from '@/data/mockData';
+import { MOCK_USERS, MOCK_TEAMS } from '@/data/mockData';
 import type { User, UserRole } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Plus, Search, Mail, MoreHorizontal, Trash2, UserX, UserCheck,
-  UserPlus, X, Eye, EyeOff, Shield, ChevronDown
+  UserPlus, X, Eye, EyeOff, Shield, SlidersHorizontal,
+  CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -14,14 +15,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAppConfig, DEFAULT_MODULES, type ModuleId } from '@/contexts/AppConfigContext';
+import { useToast } from '@/hooks/use-toast';
 
 const ROLE_CONFIG: Record<UserRole, { label: string; class: string }> = {
-  admin: { label: 'Admin', class: 'bg-destructive/10 text-destructive border-destructive/20' },
-  director: { label: 'Diretor', class: 'bg-primary/10 text-primary border-primary/20' },
+  admin:      { label: 'Admin',      class: 'bg-destructive/10 text-destructive border-destructive/20' },
+  director:   { label: 'Diretor',    class: 'bg-primary/10 text-primary border-primary/20' },
   supervisor: { label: 'Supervisor', class: 'bg-accent/10 text-accent border-accent/20' },
-  member: { label: 'Vendedor', class: 'bg-muted text-muted-foreground border-border' },
+  member:     { label: 'Vendedor',   class: 'bg-muted text-muted-foreground border-border' },
 };
 
+// ─── Create user modal ────────────────────────────────────────────────────────
 function CreateUserModal({ onClose }: { onClose: () => void }) {
   const [showPass, setShowPass] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', role: 'member', password: '' });
@@ -31,74 +35,45 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
       <DialogContent className="bg-card border-border max-w-md">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-primary" />
-            Criar Novo Usuário
+            <UserPlus className="w-4 h-4 text-primary" /> Criar Novo Usuário
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-1">
           <div>
             <label className="text-xs font-medium block mb-1.5">Nome completo</label>
-            <Input
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Ex: João Silva"
-              className="h-9 text-xs bg-secondary border-border"
-            />
+            <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ex: João Silva" className="h-9 text-xs bg-secondary border-border" />
           </div>
           <div>
             <label className="text-xs font-medium block mb-1.5">E-mail</label>
-            <Input
-              value={form.email}
-              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              placeholder="joao@appmax.com.br"
-              type="email"
-              className="h-9 text-xs bg-secondary border-border"
-            />
+            <Input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="joao@appmax.com.br" type="email" className="h-9 text-xs bg-secondary border-border" />
           </div>
           <div>
             <label className="text-xs font-medium block mb-1.5">Perfil</label>
             <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
-              <SelectTrigger className="h-9 text-xs bg-secondary border-border">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-9 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-card border-border">
-                <SelectItem value="member" className="text-xs">Vendedor</SelectItem>
+                <SelectItem value="member"     className="text-xs">Vendedor</SelectItem>
                 <SelectItem value="supervisor" className="text-xs">Supervisor</SelectItem>
-                <SelectItem value="director" className="text-xs">Diretor</SelectItem>
-                <SelectItem value="admin" className="text-xs">Admin</SelectItem>
+                <SelectItem value="director"   className="text-xs">Diretor</SelectItem>
+                <SelectItem value="admin"      className="text-xs">Admin</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
             <label className="text-xs font-medium block mb-1.5">Senha temporária</label>
             <div className="relative">
-              <Input
-                value={form.password}
-                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                type={showPass ? 'text' : 'password'}
-                placeholder="Mínimo 8 caracteres"
-                className="h-9 text-xs bg-secondary border-border pr-9"
-              />
-              <button
-                onClick={() => setShowPass(s => !s)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              >
+              <Input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} type={showPass ? 'text' : 'password'} placeholder="Mínimo 8 caracteres" className="h-9 text-xs bg-secondary border-border pr-9" />
+              <button onClick={() => setShowPass(s => !s)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
                 {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>
           <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-            <p className="text-[11px] text-muted-foreground">
-              O usuário receberá um e-mail de boas-vindas e deverá redefinir a senha no primeiro acesso.
-            </p>
+            <p className="text-[11px] text-muted-foreground">O usuário receberá um e-mail de boas-vindas e deverá redefinir a senha no primeiro acesso.</p>
           </div>
           <div className="flex gap-2 pt-1">
-            <Button size="sm" className="flex-1 bg-gradient-primary text-xs h-9">
-              <UserPlus className="w-3.5 h-3.5 mr-1.5" /> Criar Usuário
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs border-border h-9" onClick={onClose}>
-              Cancelar
-            </Button>
+            <Button size="sm" className="flex-1 bg-gradient-primary text-xs h-9"><UserPlus className="w-3.5 h-3.5 mr-1.5" /> Criar Usuário</Button>
+            <Button size="sm" variant="outline" className="text-xs border-border h-9" onClick={onClose}>Cancelar</Button>
           </div>
         </div>
       </DialogContent>
@@ -106,20 +81,19 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Delete confirm modal ─────────────────────────────────────────────────────
 function DeleteConfirmModal({ user, onClose }: { user: User; onClose: () => void }) {
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="bg-card border-border max-w-sm">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-destructive">
-            <Trash2 className="w-4 h-4" />
-            Excluir Usuário
+            <Trash2 className="w-4 h-4" /> Excluir Usuário
           </DialogTitle>
         </DialogHeader>
         <div className="py-2 space-y-4">
           <p className="text-sm text-muted-foreground">
-            Tem certeza que deseja excluir <span className="text-foreground font-semibold">{user.name}</span>?
-            Esta ação é irreversível.
+            Tem certeza que deseja excluir <span className="text-foreground font-semibold">{user.name}</span>? Esta ação é irreversível.
           </p>
           <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
             <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-full border border-border" />
@@ -129,12 +103,8 @@ function DeleteConfirmModal({ user, onClose }: { user: User; onClose: () => void
             </div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="destructive" className="flex-1 text-xs h-9">
-              <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar Exclusão
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs border-border h-9" onClick={onClose}>
-              Cancelar
-            </Button>
+            <Button size="sm" variant="destructive" className="flex-1 text-xs h-9"><Trash2 className="w-3.5 h-3.5 mr-1.5" /> Confirmar Exclusão</Button>
+            <Button size="sm" variant="outline" className="text-xs border-border h-9" onClick={onClose}>Cancelar</Button>
           </div>
         </div>
       </DialogContent>
@@ -142,12 +112,132 @@ function DeleteConfirmModal({ user, onClose }: { user: User; onClose: () => void
   );
 }
 
+// ─── User profile modal with module permissions ───────────────────────────────
+function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }) {
+  const { getUserDisabledModules, setUserModuleOverride, modules } = useAppConfig();
+  const { toast } = useToast();
+  const [disabled, setDisabled] = useState<ModuleId[]>(getUserDisabledModules(user.id));
+  const [role, setRole] = useState(user.role);
+
+  const toggle = (id: ModuleId) => {
+    setDisabled(prev =>
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
+  const save = () => {
+    setUserModuleOverride(user.id, disabled);
+    toast({ title: 'Perfil salvo', description: `Permissões de ${user.name} atualizadas.` });
+    onClose();
+  };
+
+  // Modules that are globally disabled can't be toggled here
+  const globallyDisabled = new Set(modules.filter(m => !m.enabled).map(m => m.id));
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-primary" /> Perfil & Permissões
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          {/* User info */}
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+            <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full border border-border" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">{user.name}</p>
+              <p className="text-xs text-muted-foreground">{user.email}</p>
+            </div>
+            <span className={cn('text-[10px] px-2 py-0.5 rounded-full border font-medium', ROLE_CONFIG[user.role].class)}>
+              {ROLE_CONFIG[user.role].label}
+            </span>
+          </div>
+
+          {/* Role change */}
+          <div>
+            <label className="text-xs font-medium block mb-1.5">Perfil de acesso</label>
+            <Select value={role} onValueChange={v => setRole(v as UserRole)}>
+              <SelectTrigger className="h-9 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="member"     className="text-xs">Vendedor</SelectItem>
+                <SelectItem value="supervisor" className="text-xs">Supervisor</SelectItem>
+                <SelectItem value="director"   className="text-xs">Diretor</SelectItem>
+                <SelectItem value="admin"      className="text-xs">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Module overrides */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold">Módulos visíveis para este usuário</label>
+              <span className="text-[10px] text-muted-foreground">{DEFAULT_MODULES.length - disabled.length} de {DEFAULT_MODULES.length} ativos</span>
+            </div>
+            <div className="space-y-1.5">
+              {DEFAULT_MODULES.filter(m => m.id !== 'admin').map(mod => {
+                const isGloballyOff = globallyDisabled.has(mod.id);
+                const isDisabledForUser = disabled.includes(mod.id);
+                const isOn = !isGloballyOff && !isDisabledForUser;
+                return (
+                  <div
+                    key={mod.id}
+                    className={cn(
+                      'flex items-center justify-between px-3 py-2 rounded-lg border transition-colors',
+                      isOn ? 'bg-muted/30 border-border/50' : 'bg-muted/10 border-border/20 opacity-60'
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isOn
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                        : <AlertCircle  className="w-3.5 h-3.5 text-muted-foreground" />
+                      }
+                      <span className="text-xs font-medium">{mod.label}</span>
+                      {isGloballyOff && (
+                        <span className="text-[9px] text-muted-foreground">(desativado globalmente)</span>
+                      )}
+                    </div>
+                    <button
+                      disabled={isGloballyOff}
+                      onClick={() => toggle(mod.id)}
+                      className={cn(
+                        'w-8 h-4 rounded-full border transition-all relative',
+                        isOn ? 'bg-primary border-primary/50' : 'bg-muted border-border',
+                        isGloballyOff && 'opacity-30 cursor-not-allowed'
+                      )}
+                    >
+                      <span className={cn(
+                        'absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all',
+                        isOn ? 'left-4' : 'left-0.5'
+                      )} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" className="flex-1 bg-gradient-primary text-xs h-9" onClick={save}>
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Salvar Permissões
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs border-border h-9" onClick={onClose}>Cancelar</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function UsersPage() {
   const [users, setUsers] = useState(MOCK_USERS);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [profileTarget, setProfileTarget] = useState<User | null>(null);
 
   const filtered = users.filter(u => {
     const matchSearch =
@@ -159,9 +249,7 @@ export default function UsersPage() {
 
   const toggleStatus = (id: string) => {
     setUsers(prev =>
-      prev.map(u =>
-        u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u
-      )
+      prev.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u)
     );
   };
 
@@ -173,33 +261,20 @@ export default function UsersPage() {
           <p className="text-sm text-muted-foreground">{users.length} usuários cadastrados</p>
         </div>
         <Button size="sm" className="bg-gradient-primary text-xs h-8" onClick={() => setShowCreate(true)}>
-          <Plus className="w-3.5 h-3.5 mr-1.5" />
-          Criar Usuário
+          <Plus className="w-3.5 h-3.5 mr-1.5" /> Criar Usuário
         </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative flex-1 min-w-56">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar usuários..."
-            className="pl-9 h-8 text-xs bg-secondary border-border"
-          />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar usuários..." className="pl-9 h-8 text-xs bg-secondary border-border" />
         </div>
         <div className="flex gap-1.5 flex-wrap">
           {['all', 'admin', 'director', 'supervisor', 'member'].map(r => (
-            <button
-              key={r}
-              onClick={() => setRoleFilter(r)}
-              className={cn(
-                'text-xs px-3 py-1.5 rounded-lg border transition-all',
-                roleFilter === r
-                  ? 'bg-primary/15 border-primary/30 text-primary'
-                  : 'border-border text-muted-foreground hover:bg-muted'
-              )}
-            >
+            <button key={r} onClick={() => setRoleFilter(r)}
+              className={cn('text-xs px-3 py-1.5 rounded-lg border transition-all',
+                roleFilter === r ? 'bg-primary/15 border-primary/30 text-primary' : 'border-border text-muted-foreground hover:bg-muted')}>
               {{ all: 'Todos', admin: 'Admin', director: 'Diretores', supervisor: 'Supervisores', member: 'Vendedores' }[r]}
             </button>
           ))}
@@ -234,29 +309,20 @@ export default function UsersPage() {
                   </td>
                   <td className="hidden md:table-cell">
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Mail className="w-3.5 h-3.5" />
-                      {u.email}
+                      <Mail className="w-3.5 h-3.5" /> {u.email}
                     </div>
                   </td>
                   <td className="text-center">
-                    <span className={cn('text-xs px-2.5 py-0.5 rounded-full border font-medium', rc.class)}>
-                      {rc.label}
-                    </span>
+                    <span className={cn('text-xs px-2.5 py-0.5 rounded-full border font-medium', rc.class)}>{rc.label}</span>
                   </td>
                   <td className="text-center">
-                    <span className={cn(
-                      'text-xs px-2 py-0.5 rounded-full border',
-                      u.status === 'active'
-                        ? 'bg-success/10 text-success border-success/20'
-                        : 'bg-muted text-muted-foreground border-border'
-                    )}>
+                    <span className={cn('text-xs px-2 py-0.5 rounded-full border',
+                      u.status === 'active' ? 'bg-success/10 text-success border-success/20' : 'bg-muted text-muted-foreground border-border')}>
                       {u.status === 'active' ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td className="text-center hidden lg:table-cell">
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(u.createdAt).toLocaleDateString('pt-BR')}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{new Date(u.createdAt).toLocaleDateString('pt-BR')}</span>
                   </td>
                   <td className="text-center">
                     <DropdownMenu>
@@ -265,27 +331,24 @@ export default function UsersPage() {
                           <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-card border-border w-44 text-xs">
-                        <DropdownMenuItem
-                          className="gap-2 cursor-pointer text-xs"
-                          onClick={() => toggleStatus(u.id)}
-                        >
-                          {u.status === 'active'
-                            ? <><UserX className="w-3.5 h-3.5 text-warning" /> Desativar usuário</>
-                            : <><UserCheck className="w-3.5 h-3.5 text-success" /> Ativar usuário</>
-                          }
+                      <DropdownMenuContent align="end" className="bg-card border-border w-48 text-xs">
+                        <DropdownMenuItem className="gap-2 cursor-pointer text-xs" onClick={() => setProfileTarget(u)}>
+                          <SlidersHorizontal className="w-3.5 h-3.5 text-primary" /> Perfil & Permissões
                         </DropdownMenuItem>
                         <DropdownMenuItem className="gap-2 cursor-pointer text-xs">
-                          <Shield className="w-3.5 h-3.5 text-primary" />
-                          Alterar perfil
+                          <Shield className="w-3.5 h-3.5 text-accent" /> Alterar perfil
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2 cursor-pointer text-xs" onClick={() => toggleStatus(u.id)}>
+                          {u.status === 'active'
+                            ? <><UserX className="w-3.5 h-3.5 text-warning" /> Desativar usuário</>
+                            : <><UserCheck className="w-3.5 h-3.5 text-success" /> Ativar usuário</>}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-border" />
                         <DropdownMenuItem
                           className="gap-2 cursor-pointer text-xs text-destructive focus:text-destructive focus:bg-destructive/10"
                           onClick={() => setDeleteTarget(u)}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Excluir usuário
+                          <Trash2 className="w-3.5 h-3.5" /> Excluir usuário
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -297,8 +360,9 @@ export default function UsersPage() {
         </table>
       </div>
 
-      {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} />}
-      {deleteTarget && <DeleteConfirmModal user={deleteTarget} onClose={() => setDeleteTarget(null)} />}
+      {showCreate    && <CreateUserModal   onClose={() => setShowCreate(false)} />}
+      {deleteTarget  && <DeleteConfirmModal user={deleteTarget}  onClose={() => setDeleteTarget(null)} />}
+      {profileTarget && <UserProfileModal  user={profileTarget} onClose={() => setProfileTarget(null)} />}
     </div>
   );
 }
