@@ -18,7 +18,7 @@ export const AI_CONFIG_STORAGE = {
   MEETINGS_PROMPT:     'appmax_ai_meetings_prompt',
 };
 
-interface EvalCriteria {
+export interface EvalCriteria {
   id: string;
   label: string;
   description: string;
