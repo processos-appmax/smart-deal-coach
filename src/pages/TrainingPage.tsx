@@ -1085,19 +1085,22 @@ export default function TrainingPage() {
                   <h3 className="font-semibold text-sm mb-1">{scenario.title}</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{scenario.description}</p>
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Foco</p>
-                  <div className="flex flex-wrap gap-1">
-                    {scenario.focusPoints.map((p, i) => (
-                      <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20">{p}</span>
-                    ))}
+                {/* Only admins/supervisors see the coaching guide */}
+                {isAdmin && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Guia do Coach</p>
+                    <div className="flex flex-wrap gap-1">
+                      {scenario.focusPoints.map((p, i) => (
+                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20">{p}</span>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {scenario.avoidPoints.map((p, i) => (
+                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">✕ {p}</span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {scenario.avoidPoints.map((p, i) => (
-                      <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">✕ {p}</span>
-                    ))}
-                  </div>
-                </div>
+                )}
                 <div className="flex items-center justify-between mt-auto pt-2 border-t border-border">
                   {bestScore ? (
                     <span className={cn('text-xs font-semibold', bestScore >= 85 ? 'text-success' : bestScore >= 70 ? 'text-primary' : 'text-warning')}>
