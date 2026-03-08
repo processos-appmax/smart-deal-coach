@@ -46,48 +46,107 @@ interface VoiceMessage {
   timestamp: string;
 }
 
-// ─── Mock data ───────────────────────────────────────────────────────────────
+// ─── Mock data — Appmax ────────────────────────────────────────────────────────
 const MOCK_SCENARIOS: TrainingScenario[] = [
   {
     id: 'sc_001',
-    title: 'Objeção de Preço — SaaS B2B',
-    description: 'Cliente questiona o custo frente a concorrentes. Simula um decisor financeiro de uma empresa de médio porte.',
-    focusPoints: ['Ancoragem de valor', 'ROI em números', 'Comparativo com custo da inação'],
-    avoidPoints: ['Dar desconto imediato', 'Falar mal da concorrência', 'Justificar pelo custo de desenvolvimento'],
+    title: 'Negociação de Taxas — Ecommerce Médio',
+    description: 'Dono de e-commerce está insatisfeito com as taxas atuais e ameaça migrar para a concorrência. Seu objetivo é coletar dados da operação, entender o volume e propor uma revisão de taxas que faça sentido para a Appmax.',
+    focusPoints: [
+      'Levantar volume mensal de transações (TPV)',
+      'Entender ticket médio e mix de bandeiras',
+      'Apresentar benefícios do ecossistema Appmax (antifraude, recuperação, checkout)',
+      'Propor revisão de taxa com base nos números reais',
+      'Citar aprovação acima da média do mercado como diferencial',
+    ],
+    avoidPoints: [
+      'Ceder desconto sem entender o volume do cliente',
+      'Não perguntar sobre chargeback e aprovação atual',
+      'Falar só de taxa sem apresentar valor agregado',
+      'Prometer condições que precisam de aprovação sem alinhar internamente',
+      'Ignorar a dor de perda de vendas por reprovação',
+    ],
     difficulty: 'hard',
-    persona: 'CFO de empresa de 150 funcionários, cético com novos gastos e focado em payback rápido.',
-    createdBy: 'Marcos Schuldz',
+    persona: 'Ricardo, dono de e-commerce de moda feminina. Fatura R$180k/mês, ticket médio de R$220. Está com taxa de 3,2% no crédito e ouviu que um concorrente oferece 2,8%. É direto, fala rápido e quer números concretos.',
+    createdBy: 'Appmax Training',
     createdAt: '2026-02-10',
   },
   {
     id: 'sc_002',
-    title: 'Qualificação MEDDIC — Lead Frio',
-    description: 'Lead que baixou um material mas não respondeu follow-ups. Objetivo: requalificar e identificar timing.',
-    focusPoints: ['Descoberta de dores', 'Identificar economic buyer', 'Mapear processo de decisão'],
-    avoidPoints: ['Ir direto para demo', 'Falar de preço', 'Prometer funcionalidades futuras'],
+    title: 'Prospecção — Lead Frio (Infoproduto)',
+    description: 'Você está ligando para um produtor digital que nunca ouviu falar da Appmax. Ele usa uma plataforma concorrente há 2 anos. Seu objetivo é qualificar a operação, identificar dores (aprovação baixa, sem recuperação de vendas) e gerar interesse em uma demo.',
+    focusPoints: [
+      'Apresentar a Appmax como fintech focada em conversão, não apenas gateway',
+      'Fazer perguntas sobre taxa de aprovação atual',
+      'Introduzir recuperação de carrinho e retentativa automática',
+      'Perguntar sobre volume e tipo de produto (curso, mentoria, assinatura)',
+      'Propor próximo passo concreto: demo ou envio de proposta',
+    ],
+    avoidPoints: [
+      'Entrar em detalhes técnicos de integração antes de qualificar',
+      'Falar de preço antes de entender a operação',
+      'Assumir que o cliente quer migrar — primeiro entender a dor',
+      'Gastar mais de 2 minutos sem fazer uma pergunta aberta',
+      'Prometer funcionalidades sem confirmar se existem para o caso dele',
+    ],
     difficulty: 'medium',
-    persona: 'Gestor de operações que está avaliando soluções mas não tem urgência clara definida.',
-    createdBy: 'Marcos Schuldz',
+    persona: 'Fernanda, criadora de cursos online de nutrição. Vende entre R$40k e R$60k/mês, usa plataforma de infoproduto concorrente. Não está insatisfeita, mas se ouvir que perde vendas pode abrir espaço. É educada mas ocupada.',
+    createdBy: 'Appmax Training',
     createdAt: '2026-02-15',
   },
   {
     id: 'sc_003',
-    title: 'Demo de Produto — Fechamento',
-    description: 'Demo para um prospect quente que já conhece o produto. Momento de criar urgência e fechar próximos passos.',
-    focusPoints: ['Confirmar dores mapeadas', 'Personalizar a demo', 'Criar urgência e next steps com data'],
-    avoidPoints: ['Demo genérica', 'Não confirmar budget', 'Sair sem data de decisão definida'],
+    title: 'Onboarding — Dúvidas de Integração e Saque',
+    description: 'Cliente recém-ativado está com dúvidas sobre como integrar a Appmax na loja e sobre as regras de saque. Seu objetivo é transmitir segurança, explicar o processo claramente e garantir que ele siga em frente sem abandonar o onboarding.',
+    focusPoints: [
+      'Explicar opções de integração: plugin nativo, API, link de pagamento',
+      'Esclarecer o prazo de saque (D+2 no crédito, instantâneo no PIX)',
+      'Citar suporte e equipe técnica disponível para ajudar na integração',
+      'Mencionar o dashboard e relatórios de aprovação em tempo real',
+      'Reforçar que a Appmax é autorizada pelo Banco Central — transmitir confiança',
+    ],
+    avoidPoints: [
+      'Usar termos técnicos sem explicar (webhook, payload, OAuth)',
+      'Dar informações imprecisas sobre prazo de saque',
+      'Apressar o cliente para "ativar rápido" sem entender suas dúvidas',
+      'Não oferecer suporte técnico ou materiais de apoio',
+      'Ignorar perguntas sobre segurança e conformidade',
+    ],
     difficulty: 'easy',
-    persona: 'Head de Vendas animado com a solução, mas aguardando aprovação do CEO.',
-    createdBy: 'Rafael Torres',
+    persona: 'Carlos, dono de loja virtual de suplementos, 42 anos, não é técnico. Acabou de assinar com a Appmax mas está inseguro. Preocupado com "e se der erro na integração?" e "quando vou receber meu dinheiro?". Precisa de clareza e paciência.',
+    createdBy: 'Appmax Training',
     createdAt: '2026-03-01',
+  },
+  {
+    id: 'sc_004',
+    title: 'Retenção — Cliente Ameaçando Cancelar',
+    description: 'Cliente ativo há 8 meses está insatisfeito com a taxa de aprovação e quer cancelar a conta. Você deve investigar a causa raiz, apresentar soluções e reverter o cancelamento.',
+    focusPoints: [
+      'Escutar e validar a frustração do cliente antes de apresentar solução',
+      'Investigar a causa da reprovação: tipo de produto, perfil do comprador, bandeiras',
+      'Propor revisão no antifraude ou ajuste no checkout',
+      'Apresentar dados: aprovação média da Appmax vs mercado',
+      'Oferecer acompanhamento próximo por 30 dias',
+    ],
+    avoidPoints: [
+      'Entrar na defensiva ou justificar o problema',
+      'Oferecer desconto de taxa como primeira solução',
+      'Prometer melhora sem entender a causa raiz',
+      'Deixar o cliente falar sem fazer perguntas de diagnóstico',
+      'Ameaçar com multa contratual de cancelamento',
+    ],
+    difficulty: 'hard',
+    persona: 'Alexandre, e-commerce de eletrônicos, fatura R$300k/mês. Taxa de aprovação caiu de 82% para 71% nos últimos 2 meses. Está irritado, já pesquisou concorrentes e tem uma reunião com a Cielo amanhã. Quer solução ou vai embora.',
+    createdBy: 'Appmax Training',
+    createdAt: '2026-03-05',
   },
 ];
 
 const MOCK_SESSIONS: TrainingSession[] = [
-  { id: 'ses_001', scenarioId: 'sc_001', scenarioTitle: 'Objeção de Preço — SaaS B2B', userId: 'usr_004', userName: 'Julia Lima', score: 87, duration: 18, completedAt: '2026-03-05T14:00:00', feedback: 'Excelente ancoragem de ROI. Melhorar na exploração de riscos da inação.' },
-  { id: 'ses_002', scenarioId: 'sc_002', scenarioTitle: 'Qualificação MEDDIC — Lead Frio', userId: 'usr_005', userName: 'Diego Alves', score: 72, duration: 22, completedAt: '2026-03-06T10:00:00', feedback: 'Boa descoberta, mas foi para a demo rápido demais. Falta mapear o budget authority.' },
-  { id: 'ses_003', scenarioId: 'sc_003', scenarioTitle: 'Demo de Produto — Fechamento', userId: 'usr_004', userName: 'Julia Lima', score: 94, duration: 15, completedAt: '2026-03-07T11:00:00', feedback: 'Demo excepcional. Personalizou para o contexto do cliente e fechou com data definida.' },
-  { id: 'ses_004', scenarioId: 'sc_001', scenarioTitle: 'Objeção de Preço — SaaS B2B', userId: 'usr_006', userName: 'Mariana Costa', score: 65, duration: 25, completedAt: '2026-03-07T15:00:00', feedback: 'Deu desconto antes de explorar o valor. Precisa treinar ancoragem.' },
+  { id: 'ses_001', scenarioId: 'sc_001', scenarioTitle: 'Negociação de Taxas — Ecommerce Médio', userId: 'usr_004', userName: 'Julia Lima', score: 87, duration: 18, completedAt: '2026-03-05T14:00:00', feedback: 'Boa coleta de dados da operação. Melhorar na apresentação dos diferenciais além da taxa (recuperação de vendas, antifraude).' },
+  { id: 'ses_002', scenarioId: 'sc_002', scenarioTitle: 'Prospecção — Lead Frio (Infoproduto)', userId: 'usr_005', userName: 'Diego Alves', score: 72, duration: 22, completedAt: '2026-03-06T10:00:00', feedback: 'Qualificação boa, mas foi para proposta de preço sem antes despertar a dor de aprovação. Explore mais os números antes de falar de custo.' },
+  { id: 'ses_003', scenarioId: 'sc_003', scenarioTitle: 'Onboarding — Dúvidas de Integração e Saque', userId: 'usr_004', userName: 'Julia Lima', score: 94, duration: 15, completedAt: '2026-03-07T11:00:00', feedback: 'Excelente didática. Explicou prazos de saque com clareza e ofereceu suporte técnico. Cliente saiu seguro para avançar.' },
+  { id: 'ses_004', scenarioId: 'sc_001', scenarioTitle: 'Negociação de Taxas — Ecommerce Médio', userId: 'usr_006', userName: 'Mariana Costa', score: 65, duration: 25, completedAt: '2026-03-07T15:00:00', feedback: 'Cedeu revisão de taxa antes de entender o volume completo da operação. Precisa treinar a sequência: coletar dados → apresentar valor → negociar.' },
 ];
 
 // ─── API Key Modal ────────────────────────────────────────────────────────────
@@ -289,22 +348,52 @@ function VoiceTrainingSession({
 
   // Build system prompt
   const buildSystemPrompt = () => `
-Você é um cliente em potencial participando de uma simulação de vendas de treinamento.
+Você é um cliente sendo abordado por um vendedor da Appmax, uma fintech brasileira de processamento de pagamentos para e-commerce e infoprodutos.
 
-SUA PERSONA:
+━━━ SUA PERSONA ━━━
 ${scenario.persona}
 
-CENÁRIO:
+━━━ CONTEXTO DO CENÁRIO ━━━
 ${scenario.description}
 
-REGRAS DO ROLEPLAY:
-- Fale APENAS como o cliente. Nunca quebre o personagem.
-- Responda de forma natural, como numa conversa real de vendas.
-- Seja cético mas aberto — não seja impossível, mas não ceda fácil.
-- Mantenha respostas curtas (2-4 frases) para fluir como uma call real.
-- Após 6-8 trocas, encerre naturalmente dizendo que precisa de tempo ou propondo próximo passo.
-- Responda SEMPRE em português brasileiro.
-- NÃO mencione que é uma IA ou simulação.
+━━━ SOBRE A APPMAX (contexto para suas respostas) ━━━
+A Appmax é uma processadora de pagamentos focada em e-commerce e negócios digitais. Ela oferece:
+- Processamento via cartão de crédito, PIX e boleto
+- Checkout de alta conversão com antifraude por IA
+- Recuperação automática de carrinho abandonado e retentativa de pagamento
+- Recorrência e assinaturas
+- Banco digital "Max" para empreendedores
+- Integrações com plataformas de e-commerce e infoprodutos
+- Autorizada pelo Banco Central do Brasil
+
+━━━ O QUE VOCÊ PODE PERGUNTAR AO VENDEDOR ━━━
+- Taxas de cartão de crédito (crédito à vista, parcelado, débito)
+- Taxa de PIX e boleto
+- Prazo de saque (D+2 crédito, D+0 PIX)
+- Como funciona o antifraude
+- Integrações disponíveis com plataformas (Shopify, WooCommerce, Hotmart, Kiwify etc.)
+- Taxa de chargeback e como a Appmax ajuda
+- Limite de transações ou volume mínimo
+- Suporte técnico e onboarding
+- Comparação com concorrentes (Pagar.me, Cielo, PagSeguro, Stripe, Mercado Pago)
+
+━━━ O QUE VOCÊ NÃO FAZ ━━━
+- Não fala sobre assuntos fora do contexto de pagamentos e e-commerce
+- Não toma decisões no primeiro contato sem pensar (seja realista)
+- Não aceita promessas vagas — exige números e prazos concretos
+- Não revela sua taxa atual facilmente — o vendedor precisa perguntar
+- Não simula ser técnico se sua persona for leiga em tecnologia
+
+━━━ REGRAS DO ROLEPLAY ━━━
+- Fale APENAS como o cliente descrito na sua persona. NUNCA quebre o personagem.
+- Responda de forma natural, como numa ligação ou reunião de vendas real.
+- Seja cético mas aberto: não ceda fácil, mas também não seja impossível.
+- Mantenha respostas curtas (2-4 frases) para simular ritmo de conversa real.
+- Faça perguntas que um dono de e-commerce faria naturalmente.
+- Após 7-9 trocas, encerre naturalmente: "Vou pensar e te retorno", "Me manda uma proposta" ou "Pode marcar uma demo".
+- Responda SEMPRE em português brasileiro informal.
+- NUNCA mencione que é IA, simulação ou treinamento.
+- Se o vendedor cometer erros (dar desconto sem entender o volume, prometer sem checar), reaja como um cliente real ficaria: desconfiante ou explorador.
   `.trim();
 
   // Speak text via Web Speech Synthesis
@@ -371,8 +460,8 @@ REGRAS DO ROLEPLAY:
       }]);
 
       // Check if session should end (after many turns or AI signals end)
-      const isEnd = historyRef.current.filter(m => m.role === 'user').length >= 8 ||
-        /encerr|finaliz|próxima reunião|obrigado pela conversa|até logo/i.test(reply);
+      const isEnd = historyRef.current.filter(m => m.role === 'user').length >= 9 ||
+        /encerr|finaliz|próxima reunião|obrigado pela conversa|até logo|me manda a proposta|vou pensar|retorno pra você|manda o contrato/i.test(reply);
 
       if (isEnd) {
         setCallState('speaking');
@@ -401,19 +490,32 @@ REGRAS DO ROLEPLAY:
 
     try {
       const evalPrompt = `
-Você é um coach de vendas especialista. Analise esta simulação de vendas e avalie o vendedor.
+Você é um coach especialista em vendas B2B para fintechs e processadoras de pagamentos, com foco em e-commerce.
+Analise esta simulação de vendas da Appmax (processadora de pagamentos) e avalie o desempenho do vendedor.
 
 CENÁRIO: ${scenario.title}
-FOCO: ${scenario.focusPoints.join(', ')}
-EVITAR: ${scenario.avoidPoints.join(', ')}
+PERSONA DO CLIENTE: ${scenario.persona}
 
-TRANSCRIÇÃO:
-${historyRef.current.map(m => `${m.role === 'user' ? 'VENDEDOR' : 'CLIENTE'}: ${m.content}`).join('\n')}
+O VENDEDOR DEVIA FOCAR EM:
+${scenario.focusPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+O VENDEDOR DEVIA EVITAR:
+${scenario.avoidPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+TRANSCRIÇÃO DA SIMULAÇÃO:
+${historyRef.current.map(m => `${m.role === 'user' ? '🟦 VENDEDOR' : '🟥 CLIENTE'}: ${m.content}`).join('\n')}
+
+Avalie de 0 a 100 o desempenho do vendedor com base em:
+- Levantamento correto de dados da operação do cliente (volume, ticket médio, aprovação atual)
+- Apresentação de valor além da taxa (antifraude, recuperação de vendas, checkout)
+- Tratamento de objeções de forma consultiva
+- Condução da conversa em direção a um próximo passo concreto
+- Evitou os erros listados acima?
 
 Responda em JSON com:
 {
   "score": <número de 0 a 100>,
-  "feedback": "<2-3 frases de feedback construtivo em português>"
+  "feedback": "<feedback específico em 3-4 frases: o que foi bem, o que precisa melhorar e uma dica prática para a próxima simulação>"
 }
 `;
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -514,7 +616,14 @@ Responda em JSON com:
     setTranscript([]);
     setElapsedSeconds(0);
 
-    const greeting = `Olá! ${scenario.persona.split('.')[0]}. Pode falar.`;
+    // Generate a natural greeting based on the scenario context
+    const greetings: Record<string, string> = {
+      sc_001: 'Alô? Oi, pode falar.',
+      sc_002: 'Oi, tudo bem? Com quem eu tô falando?',
+      sc_003: 'Oi! Tô aqui, pode falar.',
+      sc_004: 'Oi, sim, tô te esperando. O que você tem pra me dizer?',
+    };
+    const greeting = greetings[scenario.id] ?? 'Alô? Pode falar.';
     const greetingMsg = { role: 'assistant' as const, content: greeting, timestamp: new Date().toISOString() };
 
     historyRef.current.push({ role: 'assistant', content: greeting });
