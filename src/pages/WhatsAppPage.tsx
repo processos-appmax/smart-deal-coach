@@ -238,9 +238,11 @@ export default function WhatsAppPage() {
     );
   };
 
-  const loadChats = useCallback(async (instanceName: string) => {
-    setLoadingChats(true);
-    setChats([]);
+  const loadChats = useCallback(async (instanceName: string, silent = false) => {
+    if (!silent) {
+      setLoadingChats(true);
+      setChats([]);
+    }
     try {
       const data = await evoFetch(`/chat/findChats/${instanceName}`, {
         method: 'POST',
@@ -266,13 +268,15 @@ export default function WhatsAppPage() {
         const existing = phoneMap.get(phone);
 
         if (!existing) {
+          // displayPhone: for @lid use phoneJid number (real phone), for @s.whatsapp.net use phone directly
+          const displayPhone = isLid ? (phoneJid?.replace(/@.*/, '') || phone) : phone;
           phoneMap.set(phone, {
             id: jid,
             remoteJid: jid,
             // For @lid chats, remoteJidAlt = phone JID; for phone JID chats, remoteJidAlt = undefined (not needed)
             remoteJidAlt: isLid ? phoneJid : undefined,
-            phone,
-            name: c.name || c.pushName || c.lastMessage?.pushName || phone || 'Desconhecido',
+            phone: displayPhone,
+            name: c.name || c.pushName || c.lastMessage?.pushName || displayPhone || 'Desconhecido',
             lastMessage:
               c.lastMessage?.message?.conversation ||
               c.lastMessage?.message?.extendedTextMessage?.text ||
@@ -299,20 +303,41 @@ export default function WhatsAppPage() {
             mergedEntry.remoteJid = jid;
             mergedEntry.id = jid;
             mergedEntry.remoteJidAlt = existing.remoteJid; // save the old @s.whatsapp.net as alt
+            // existing.phone already has the real phone number (from @s.whatsapp.net)
+            mergedEntry.phone = existing.phone;
           } else if (!isLid && existingIsLid) {
-            // Existing is @lid (preferred) — store new phone JID as alt
+            // Existing is @lid (preferred) — store new phone JID as alt, update phone to real number
             mergedEntry.remoteJidAlt = jid;
+            mergedEntry.phone = phone; // phone here is extracted from @s.whatsapp.net = real number
           }
           phoneMap.set(phone, mergedEntry);
         }
       }
       // Sort by latest message
       const sorted = Array.from(phoneMap.values()).sort((a, b) => b.lastMessageTs - a.lastMessageTs);
-      setChats(sorted.slice(0, 200));
+      if (silent) {
+        // On silent poll: merge unread counts but keep 0 for the active chat
+        setChats(prev => {
+          const prevMap = new Map(prev.map(c => [c.id, c]));
+          return sorted.map(newChat => {
+            const existing = prevMap.get(newChat.id);
+            // If this chat is currently open, keep unread = 0
+            const isOpen = activeChatRef.current?.id === newChat.id;
+            return {
+              ...newChat,
+              unread: isOpen ? 0 : newChat.unread,
+              // If we had previously zeroed a badge by clicking, don't re-show unless there's actually new unread
+              ...(existing && existing.unread === 0 && newChat.unread === 0 ? {} : {}),
+            };
+          });
+        });
+      } else {
+        setChats(sorted.slice(0, 200));
+      }
     } catch {
-      setChats([]);
+      if (!silent) setChats([]);
     } finally {
-      setLoadingChats(false);
+      if (!silent) setLoadingChats(false);
     }
   }, []);
 
@@ -329,7 +354,7 @@ export default function WhatsAppPage() {
   // Poll chat list every 10s to update unread counts and new conversations
   useEffect(() => {
     if (!activeInstance || activeInstance.connectionStatus !== 'open') return;
-    const t = setInterval(() => loadChats(activeInstance.name), 10000);
+    const t = setInterval(() => loadChats(activeInstance.name, true), 10000);
     return () => clearInterval(t);
   }, [activeInstance?.name, activeInstance?.connectionStatus]);
 
@@ -350,6 +375,9 @@ export default function WhatsAppPage() {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Ref to track active chat inside polling callbacks without stale closure
+  const activeChatRef = useRef<Chat | null>(null);
+  useEffect(() => { activeChatRef.current = activeChat; }, [activeChat]);
 
   // loadMessages: for @lid chats, query the @lid directly (Evolution stores both directions under @lid).
   // Do NOT add phoneJid = remoteJidAlt, because remoteJidAlt is the instance owner's JID, not the contact's.
