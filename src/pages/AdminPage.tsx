@@ -33,7 +33,9 @@ const TOKEN_FIELDS: { key: keyof import('@/contexts/AppConfigContext').OpenAITok
 export default function AdminPage() {
   const [section, setSection] = useState('company');
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
-  const { tokens, setToken, modules, setModuleEnabled, saveConfig } = useAppConfig();
+  const [moduleTarget, setModuleTarget] = useState<'global' | string>('global'); // 'global' | userId | teamId
+  const { tokens, setToken, modules, setModuleEnabled, saveConfig,
+          getUserDisabledModules, setUserModuleOverride } = useAppConfig();
   const { toast } = useToast();
 
   const toggleKey = (k: string) => setShowKey(prev => ({ ...prev, [k]: !prev[k] }));
@@ -43,8 +45,20 @@ export default function AdminPage() {
     toast({ title: 'Tokens salvos', description: 'Configurações de API atualizadas com sucesso.' });
   };
 
-  // Modules that should always stay visible (admin cannot disable admin itself)
   const isLocked = (id: ModuleId) => id === 'admin';
+
+  // For per-user/team module overrides
+  const targetDisabled = moduleTarget === 'global' ? [] : getUserDisabledModules(moduleTarget);
+  const toggleTargetModule = (id: ModuleId) => {
+    if (moduleTarget === 'global') {
+      setModuleEnabled(id, !!modules.find(m => m.id === id && !m.enabled));
+      return;
+    }
+    const cur = getUserDisabledModules(moduleTarget);
+    const next = cur.includes(id) ? cur.filter(m => m !== id) : [...cur, id];
+    setUserModuleOverride(moduleTarget, next);
+    toast({ title: 'Salvo', description: 'Permissões de módulo atualizadas.' });
+  };
 
   return (
     <div className="page-container animate-fade-in">
