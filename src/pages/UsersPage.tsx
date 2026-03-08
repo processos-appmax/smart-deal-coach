@@ -194,6 +194,7 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
   const { getUserDisabledModules, setUserModuleOverride, modules } = useAppConfig();
   const { toast } = useToast();
   const [disabled, setDisabled] = useState<ModuleId[]>(getUserDisabledModules(user.id));
+  const [selectedInstance, setSelectedInstance] = useState(() => getInstanceForUser(user.id));
 
   const toggle = (id: ModuleId) => {
     setDisabled(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
@@ -201,9 +202,12 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
 
   const globallyDisabled = new Set(modules.filter(m => !m.enabled).map(m => m.id));
 
+  const assignedInst = MOCK_WHATSAPP_INSTANCES.find(i => i.id === selectedInstance);
+
   const save = () => {
     setUserModuleOverride(user.id, disabled);
-    toast({ title: 'Permissões salvas', description: `Módulos de ${user.name} atualizados.` });
+    setInstanceForUser(user.id, selectedInstance);
+    toast({ title: 'Perfil salvo', description: `Configurações de ${user.name} atualizadas.` });
     onClose();
   };
 
@@ -212,7 +216,7 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
       <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-primary" /> Módulos Visíveis — {user.name}
+            <SlidersHorizontal className="w-4 h-4 text-primary" /> Perfil & Permissões — {user.name}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-1">
@@ -226,9 +230,43 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
               {ROLE_CONFIG[user.role].label}
             </span>
           </div>
+
+          {/* WhatsApp instance assignment */}
+          <div className="p-3 rounded-xl border border-border space-y-2">
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-accent" />
+              <label className="text-xs font-semibold">Instância WhatsApp</label>
+            </div>
+            <Select value={selectedInstance} onValueChange={setSelectedInstance}>
+              <SelectTrigger className="h-9 text-xs bg-secondary border-border"><SelectValue placeholder="Selecionar instância..." /></SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="" className="text-xs text-muted-foreground">— Sem instância —</SelectItem>
+                {MOCK_WHATSAPP_INSTANCES.map(inst => (
+                  <SelectItem key={inst.id} value={inst.id} className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('w-1.5 h-1.5 rounded-full', inst.status === 'connected' ? 'bg-success' : 'bg-muted-foreground')} />
+                      {inst.name}
+                      {inst.phone && <span className="text-muted-foreground font-mono ml-1">{inst.phone}</span>}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {assignedInst && (
+              <div className={cn('flex items-center gap-2 text-[10px] px-2 py-1 rounded-lg border',
+                assignedInst.status === 'connected' ? 'bg-success/5 border-success/20 text-success' : 'bg-muted/30 border-border text-muted-foreground')}>
+                <Smartphone className="w-3 h-3" />
+                {assignedInst.phone || assignedInst.name}
+                <span className={cn('ml-auto font-medium', assignedInst.status === 'connected' ? 'text-success' : 'text-muted-foreground')}>
+                  {assignedInst.status === 'connected' ? '● Conectado' : '○ Desconectado'}
+                </span>
+              </div>
+            )}
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold">Módulos visíveis para este usuário</label>
+              <label className="text-xs font-semibold">Módulos visíveis</label>
               <span className="text-[10px] text-muted-foreground">{DEFAULT_MODULES.length - disabled.length} de {DEFAULT_MODULES.length} ativos</span>
             </div>
             <div className="space-y-1.5">
