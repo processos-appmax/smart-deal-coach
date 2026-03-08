@@ -332,6 +332,7 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const { instances } = useEvolutionInstances();
   const [users, setUsers] = useState(MOCK_USERS);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
