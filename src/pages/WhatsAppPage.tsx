@@ -29,6 +29,7 @@ interface Chat {
   phone: string;
   lastMessage: string;
   lastMessageTs: number;
+  lastMessageFromMe: boolean; // used to detect new incoming msgs on poll
   unread: number;
 }
 
