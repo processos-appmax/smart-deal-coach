@@ -431,6 +431,8 @@ export default function AIConfigPage() {
       toast({ variant: 'destructive', title: 'Erro no teste', description: e.message });
     } finally { setTestLoading(false); }
   };
+
+  return (
     <div className="page-container animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
