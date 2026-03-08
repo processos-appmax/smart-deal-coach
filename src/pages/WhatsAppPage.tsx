@@ -370,6 +370,9 @@ export default function WhatsAppPage() {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Ref to track active chat inside polling callbacks without stale closure
+  const activeChatRef = useRef<Chat | null>(null);
+  useEffect(() => { activeChatRef.current = activeChat; }, [activeChat]);
 
   // loadMessages: for @lid chats, query the @lid directly (Evolution stores both directions under @lid).
   // Do NOT add phoneJid = remoteJidAlt, because remoteJidAlt is the instance owner's JID, not the contact's.
