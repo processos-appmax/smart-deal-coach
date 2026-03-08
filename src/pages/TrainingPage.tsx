@@ -460,8 +460,8 @@ A Appmax é uma processadora de pagamentos focada em e-commerce e negócios digi
       }]);
 
       // Check if session should end (after many turns or AI signals end)
-      const isEnd = historyRef.current.filter(m => m.role === 'user').length >= 8 ||
-        /encerr|finaliz|próxima reunião|obrigado pela conversa|até logo/i.test(reply);
+      const isEnd = historyRef.current.filter(m => m.role === 'user').length >= 9 ||
+        /encerr|finaliz|próxima reunião|obrigado pela conversa|até logo|me manda a proposta|vou pensar|retorno pra você|manda o contrato/i.test(reply);
 
       if (isEnd) {
         setCallState('speaking');
