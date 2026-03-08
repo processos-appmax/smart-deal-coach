@@ -43,6 +43,7 @@ interface Chat {
   id: string;
   remoteJid: string;
   name: string;
+  phone: string; // always the resolved phone number (no @lid)
   lastMessage: string;
   lastMessageTs: number;
   unread: number;
