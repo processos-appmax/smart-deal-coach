@@ -326,19 +326,28 @@ function CriteriaModal({
   );
 }
 
+function loadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    const s = localStorage.getItem(key);
+    return s ? JSON.parse(s) : fallback;
+  } catch { return fallback; }
+}
+
 export default function AIConfigPage() {
   const { toast } = useToast();
   const [activeType, setActiveType] = useState<'meetings' | 'whatsapp'>('meetings');
-  const [meetingCriteria, setMeetingCriteria] = useState(DEFAULT_MEETING_CRITERIA);
-  const [whatsappCriteria, setWhatsappCriteria] = useState(DEFAULT_WHATSAPP_CRITERIA);
+  const [meetingCriteria, setMeetingCriteria] = useState<EvalCriteria[]>(() =>
+    loadFromStorage(AI_CONFIG_STORAGE.MEETINGS_CRITERIA, DEFAULT_MEETING_CRITERIA));
+  const [whatsappCriteria, setWhatsappCriteria] = useState<EvalCriteria[]>(() =>
+    loadFromStorage(AI_CONFIG_STORAGE.WHATSAPP_CRITERIA, DEFAULT_WHATSAPP_CRITERIA));
   const [editingCriteria, setEditingCriteria] = useState<EvalCriteria | null>(null);
   const [addingCriteria, setAddingCriteria] = useState(false);
-  const [meetingPrompt, setMeetingPrompt] = useState(
-    'Você é um avaliador especialista em vendas consultivas. Analise a transcrição da reunião e avalie cada critério com base nos sinais identificados. Seja específico e construtivo nos feedbacks.'
-  );
-  const [whatsappPrompt, setWhatsappPrompt] = useState(
-    'Você é um especialista em vendas digitais e atendimento via WhatsApp. Avalie as conversas com foco em efetividade comercial, qualificação de leads e conversão.'
-  );
+  const [meetingPrompt, setMeetingPrompt] = useState<string>(() =>
+    loadFromStorage(AI_CONFIG_STORAGE.MEETINGS_PROMPT,
+      'Você é um avaliador especialista em vendas consultivas. Analise a transcrição da reunião e avalie cada critério com base nos sinais identificados. Seja específico e construtivo nos feedbacks.'));
+  const [whatsappPrompt, setWhatsappPrompt] = useState<string>(() =>
+    loadFromStorage(AI_CONFIG_STORAGE.WHATSAPP_PROMPT,
+      'Você é um especialista em vendas digitais e atendimento via WhatsApp. Avalie as conversas com foco em efetividade comercial, qualificação de leads e conversão.'));
 
   const criteria = activeType === 'meetings' ? meetingCriteria : whatsappCriteria;
   const setCriteria = activeType === 'meetings' ? setMeetingCriteria : setWhatsappCriteria;
@@ -366,6 +375,14 @@ export default function AIConfigPage() {
         description: `Os pesos devem somar 100%. Atualmente somam ${totalWeight}%.`,
       });
       return;
+    }
+    // Persist to localStorage so other pages (WhatsApp analysis) can read
+    if (activeType === 'meetings') {
+      localStorage.setItem(AI_CONFIG_STORAGE.MEETINGS_CRITERIA, JSON.stringify(meetingCriteria));
+      localStorage.setItem(AI_CONFIG_STORAGE.MEETINGS_PROMPT, JSON.stringify(meetingPrompt));
+    } else {
+      localStorage.setItem(AI_CONFIG_STORAGE.WHATSAPP_CRITERIA, JSON.stringify(whatsappCriteria));
+      localStorage.setItem(AI_CONFIG_STORAGE.WHATSAPP_PROMPT, JSON.stringify(whatsappPrompt));
     }
     toast({
       title: 'Configuração salva!',
