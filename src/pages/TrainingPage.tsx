@@ -735,15 +735,15 @@ Responda em JSON com:
 
               {/* Mic button */}
               <button
-                onClick={() => {
-                  if (callState === 'listening') {
-                    recognitionRef.current?.stop();
-                    setCallState('idle');
-                  } else if (callState === 'idle' || callState === 'speaking') {
-                    startListening();
-                  }
-                }}
-                disabled={callState === 'processing' || callState === 'connecting' || callState === 'speaking'}
+              onClick={() => {
+                if (callState === 'listening') {
+                  recognitionRef.current?.stop();
+                  setCallState('connecting');
+                } else {
+                  startListening();
+                }
+              }}
+              disabled={callState === 'processing' || callState === 'connecting' || callState === 'speaking'}
                 className={cn(
                   'w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-lg relative',
                   callState === 'listening'
