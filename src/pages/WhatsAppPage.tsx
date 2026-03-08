@@ -446,6 +446,7 @@ export default function WhatsAppPage() {
 
   const [showCreateInst, setShowCreateInst] = useState(false);
   const [qrInstanceName, setQrInstanceName] = useState<string | null>(null);
+  const [showAiPanel, setShowAiPanel] = useState(false);
 
   // ── Instance filters ────────────────────────────────────────────────────────
   type InstStatusFilter = 'all' | 'connected' | 'disconnected';
