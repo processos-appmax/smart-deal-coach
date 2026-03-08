@@ -240,22 +240,55 @@ export default function WhatsAppPage() {
 
 
   const parseBody = (m: any): string => {
-...
-      const jid: string = c.remoteJid || c.id || '';
+    const msg = m.message || {};
+    return (
+      msg.conversation ||
+      msg.extendedTextMessage?.text ||
+      msg.imageMessage?.caption ||
+      msg.videoMessage?.caption ||
+      msg.documentMessage?.title ||
+      (msg.audioMessage ? '🎵 Áudio' : '') ||
+      (msg.stickerMessage ? '🪄 Sticker' : '') ||
+      (msg.locationMessage ? '📍 Localização' : '') ||
+      '[mídia]'
+    );
+  };
+
+  const loadChats = useCallback(async (instanceName: string, silent = false) => {
+    if (!silent) {
+      setLoadingChats(true);
+      setChats([]);
+    }
+    try {
+      const data = await evoFetch(`/chat/findChats/${instanceName}`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      const raw: any[] = Array.isArray(data) ? data : (data?.chats || []);
+
+      const phoneMap = new Map<string, Chat>();
+      for (const c of raw) {
+        const phone = resolvePhone(c);
+        if (!phone) continue;
+        const ts =
+          c.lastMessage?.messageTimestamp ||
+          (c.updatedAt ? Math.floor(new Date(c.updatedAt).getTime() / 1000) : 0);
+
+        const jid: string = c.remoteJid || c.id || '';
         const isLid = jid.includes('@lid');
+
+        // Real phone to display: use getRealPhone which prefers @s.whatsapp.net or API fields
+        const realPhone = getRealPhone(c);
 
         const existing = phoneMap.get(phone);
 
         if (!existing) {
-          // displayPhone: for @lid use phoneJid number (real phone), for @s.whatsapp.net use phone directly
-          const displayPhone = isLid ? (phoneJid?.replace(/@.*/, '') || phone) : phone;
           phoneMap.set(phone, {
             id: jid,
             remoteJid: jid,
-            // For @lid chats, remoteJidAlt = phone JID; for phone JID chats, remoteJidAlt = undefined (not needed)
-            remoteJidAlt: isLid ? phoneJid : undefined,
-            phone: displayPhone,
-            name: c.name || c.pushName || c.lastMessage?.pushName || displayPhone || 'Desconhecido',
+            remoteJidAlt: undefined,
+            phone: realPhone || phone, // use real phone if available, else LID number as fallback
+            name: c.name || c.pushName || c.lastMessage?.pushName || realPhone || phone || 'Desconhecido',
             lastMessage:
               c.lastMessage?.message?.conversation ||
               c.lastMessage?.message?.extendedTextMessage?.text ||
