@@ -188,10 +188,14 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(STORAGE_KEY_OVERRIDES, JSON.stringify(userModuleOverrides));
   }, [userModuleOverrides]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_MODELS, JSON.stringify(models));
+  }, [models]);
+
   return (
     <AppConfigContext.Provider value={{
-      tokens, modules, userModuleOverrides,
-      setToken, setModuleEnabled, isModuleEnabled,
+      tokens, models, modules, userModuleOverrides,
+      setToken, setModuleModel, setModuleEnabled, isModuleEnabled,
       setUserModuleOverride, getUserDisabledModules, isModuleEnabledForUser,
       saveConfig,
     }}>
