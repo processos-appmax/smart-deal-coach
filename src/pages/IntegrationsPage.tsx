@@ -9,13 +9,15 @@ import {
   Phone, Wifi, WifiOff, X, CheckCircle2, XCircle,
   Calendar, Video, HardDrive, LogOut, ShieldCheck,
   AlertTriangle, Activity, ArrowDown, ArrowUp, CheckCheck,
-  ExternalLink
+  ExternalLink, Database
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getInstanceForUser, setInstanceForUser } from '@/hooks/useEvolutionInstances';
 import { loadAllowedUsers } from '@/lib/accessControl';
+import { supabase } from '@/integrations/supabase/client';
+import { getSaasEmpresaId } from '@/lib/saas';
 
 // ─── Evolution API config ─────────────────────────────────────────────────────
 const EVOLUTION_API_URL = import.meta.env.VITE_EVOLUTION_API_URL || '';
@@ -441,10 +443,36 @@ function EvolutionPanel() {
     setLoading(true);
     setError(null);
     try {
+      // Load from DB first for instant display
+      try {
+        const empresaId = await getSaasEmpresaId();
+        const { data: dbData } = await supabase
+          .schema('saas')
+          .from('instancias_whatsapp')
+          .select('id,nome,telefone,status,owner_jid')
+          .eq('empresa_id', empresaId)
+          .order('nome', { ascending: true });
+
+        if (dbData && dbData.length > 0) {
+          const statusMap: Record<string, string> = { conectada: 'open', desconectada: 'close', conectando: 'connecting' };
+          setInstances(dbData.map(r => ({
+            id: r.id,
+            name: r.nome,
+            connectionStatus: statusMap[r.status] || 'close',
+            ownerJid: r.owner_jid || undefined,
+            profileName: r.nome,
+          })));
+        }
+      } catch { /* DB read failed, will try API */ }
+
+      // Then fetch live from Evolution API
       const data = await evolutionFetch('/instance/fetchInstances');
       setInstances(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      setError(`Erro ao carregar instâncias: ${e.message}`);
+      // Only show error if we have no instances at all
+      if (instances.length === 0) {
+        setError(`Erro ao carregar instâncias: ${e.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -802,9 +830,198 @@ function WebhookLogs() {
   );
 }
 
+// ─── Database Integrations Panel ─────────────────────────────────────────────
+interface DbIntegration {
+  id: string;
+  tipo: string;
+  nome: string;
+  status: string;
+  configuracao: Record<string, unknown>;
+  conectado_em: string | null;
+}
+
+interface DbToken {
+  id: number;
+  modulo_codigo: string;
+  provedor: string;
+  modelo: string | null;
+  ativo: boolean;
+}
+
+function DatabasePanel() {
+  const [integrations, setIntegrations] = useState<DbIntegration[]>([]);
+  const [tokens, setTokens] = useState<DbToken[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const empresaId = await getSaasEmpresaId();
+
+      const [intRes, tokRes] = await Promise.all([
+        supabase.schema('saas').from('integracoes')
+          .select('id,tipo,nome,status,configuracao,conectado_em')
+          .eq('empresa_id', empresaId)
+          .order('tipo', { ascending: true }),
+        supabase.schema('saas').from('tokens_ia_modulo')
+          .select('id,modulo_codigo,provedor,modelo,ativo')
+          .eq('empresa_id', empresaId)
+          .order('modulo_codigo', { ascending: true }),
+      ]);
+
+      if (intRes.error) throw intRes.error;
+      if (tokRes.error) throw tokRes.error;
+
+      setIntegrations((intRes.data || []) as unknown as DbIntegration[]);
+      setTokens((tokRes.data || []) as unknown as DbToken[]);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao carregar dados do banco', description: e.message });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const statusLabel: Record<string, { label: string; class: string }> = {
+    conectada: { label: 'Conectada', class: 'bg-success/10 text-success border-success/20' },
+    desconectada: { label: 'Desconectada', class: 'bg-muted text-muted-foreground border-border' },
+    erro: { label: 'Erro', class: 'bg-destructive/10 text-destructive border-destructive/20' },
+  };
+
+  const tipoIcon: Record<string, string> = {
+    evolution_api: '📱',
+    openai: '🤖',
+    google_calendar: '📅',
+    google_meet: '🎥',
+    hubspot: '🔗',
+    n8n: '⚡',
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        <span className="text-xs">Carregando dados do banco...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Integrations */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold">Integrações cadastradas</h3>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">{integrations.length}</span>
+          </div>
+          <Button size="sm" variant="outline" className="text-xs h-7 border-border gap-1.5" onClick={loadData}>
+            <RefreshCw className="w-3 h-3" /> Atualizar
+          </Button>
+        </div>
+
+        {integrations.length === 0 ? (
+          <div className="text-center py-6 glass-card">
+            <p className="text-xs text-muted-foreground">Nenhuma integração cadastrada no banco</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {integrations.map(int => {
+              const st = statusLabel[int.status] || statusLabel.desconectada;
+              return (
+                <div key={int.id} className="glass-card p-4 flex flex-col gap-2">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{tipoIcon[int.tipo] || '🔌'}</span>
+                      <div>
+                        <p className="text-xs font-semibold">{int.nome}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{int.tipo}</p>
+                      </div>
+                    </div>
+                    <span className={cn('inline-flex items-center text-[10px] px-2 py-0.5 rounded-full border font-medium', st.class)}>
+                      {st.label}
+                    </span>
+                  </div>
+                  {int.configuracao && Object.keys(int.configuracao).length > 0 && (
+                    <div className="bg-secondary/50 rounded-lg p-2 mt-1">
+                      {Object.entries(int.configuracao).map(([key, val]) => (
+                        <div key={key} className="flex justify-between text-[10px] py-0.5">
+                          <span className="text-muted-foreground">{key}</span>
+                          <span className="font-mono text-foreground truncate max-w-[180px]">
+                            {String(val).startsWith('sk-') || key === 'token'
+                              ? `${String(val).slice(0, 8)}...${String(val).slice(-4)}`
+                              : String(val)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {int.conectado_em && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Conectado em {new Date(int.conectado_em).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* AI Tokens */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-lg">🤖</span>
+          <h3 className="text-sm font-semibold">Tokens de IA por módulo</h3>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 font-medium">{tokens.length}</span>
+        </div>
+
+        {tokens.length === 0 ? (
+          <div className="text-center py-6 glass-card">
+            <p className="text-xs text-muted-foreground">Nenhum token de IA cadastrado no banco</p>
+          </div>
+        ) : (
+          <div className="glass-card overflow-hidden">
+            <table className="w-full data-table">
+              <thead>
+                <tr>
+                  <th className="text-left">Módulo</th>
+                  <th className="text-left">Provedor</th>
+                  <th className="text-left">Modelo</th>
+                  <th className="text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tokens.map(tok => (
+                  <tr key={tok.id}>
+                    <td><span className="text-xs font-semibold capitalize">{tok.modulo_codigo}</span></td>
+                    <td><span className="text-xs text-muted-foreground">{tok.provedor}</span></td>
+                    <td><span className="text-xs font-mono">{tok.modelo || '—'}</span></td>
+                    <td className="text-center">
+                      <span className={cn(
+                        'inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-medium',
+                        tok.ativo ? 'bg-success/10 text-success border-success/20' : 'bg-muted text-muted-foreground border-border'
+                      )}>
+                        {tok.ativo ? '● Ativo' : '○ Inativo'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function IntegrationsPage() {
-  const [tab, setTab] = useState<'google' | 'whatsapp' | 'logs'>('google');
+  const [tab, setTab] = useState<'google' | 'whatsapp' | 'database' | 'logs'>('google');
 
   return (
     <div className="page-container animate-fade-in">
@@ -826,6 +1043,7 @@ export default function IntegrationsPage() {
             </svg>
           )},
           { key: 'whatsapp', label: 'WhatsApp',  icon: MessageSquare },
+          { key: 'database', label: 'Banco / Tokens', icon: Database },
           { key: 'logs',     label: 'Logs',      icon: Activity },
         ].map(t => {
           const IconComp = t.icon;
@@ -842,6 +1060,7 @@ export default function IntegrationsPage() {
 
       {tab === 'google'   && <GooglePanel />}
       {tab === 'whatsapp' && <EvolutionPanel />}
+      {tab === 'database' && <DatabasePanel />}
       {tab === 'logs'     && <WebhookLogs />}
     </div>
   );
