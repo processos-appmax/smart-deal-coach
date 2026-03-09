@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserRole } from '@/types';
 import { ROLE_HIERARCHY } from '@/types';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
+import { useAuditLog } from '@/contexts/AuditLogContext';
 
 interface AuthContextType {
   user: User | null;
@@ -10,16 +11,13 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => void;
-  /** True if user's role is one of the listed roles */
   hasRole: (roles: UserRole[]) => boolean;
-  /** True if user's role is >= minRole in the hierarchy (i.e. has equal or higher authority) */
   hasMinRole: (minRole: UserRole) => boolean;
   canAccess: (resource: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Mock admin user for demo
 const MOCK_USER: User = {
   id: 'usr_001',
   name: 'Marcos Schuldz',
@@ -40,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { canAccess: roleCanAccess } = useRolePermissions();
+  const { addEvent } = useAuditLog();
 
   useEffect(() => {
     const stored = localStorage.getItem('appmax_user');
@@ -49,6 +48,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setIsLoading(false);
   }, []);
+
+  const recordLogin = (u: User) => {
+    addEvent({
+      type: 'login',
+      userId: u.id,
+      userName: u.name,
+      userRole: u.role,
+      userEmail: u.email,
+      page: '',
+      pageLabel: '',
+    });
+  };
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -60,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const u = email === DEMO_CREDENTIALS.email ? { ...MOCK_USER } : { ...MOCK_USER, email };
     setUser(u);
     localStorage.setItem('appmax_user', JSON.stringify(u));
+    recordLogin(u);
     setIsLoading(false);
   };
 
@@ -68,27 +80,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await new Promise(r => setTimeout(r, 600));
     setUser(MOCK_USER);
     localStorage.setItem('appmax_user', JSON.stringify(MOCK_USER));
+    recordLogin(MOCK_USER);
     setIsLoading(false);
   };
 
   const logout = () => {
+    if (user) {
+      addEvent({
+        type: 'logout',
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        userEmail: user.email,
+        page: '',
+        pageLabel: '',
+      });
+    }
     setUser(null);
     localStorage.removeItem('appmax_user');
   };
 
   const hasRole = (roles: UserRole[]) => !!user && roles.includes(user.role);
 
-  // Returns true if the logged-in user has authority >= minRole
   const hasMinRole = (minRole: UserRole): boolean => {
     if (!user) return false;
     const userIdx = ROLE_HIERARCHY.indexOf(user.role);
     const minIdx  = ROLE_HIERARCHY.indexOf(minRole);
-    return userIdx <= minIdx; // lower index = higher authority
+    return userIdx <= minIdx;
   };
 
   const canAccess = (resource: string) => {
     if (!user) return false;
-    // admin always gets everything
     if (user.role === 'admin') return true;
     return roleCanAccess(user.role, resource as any);
   };
