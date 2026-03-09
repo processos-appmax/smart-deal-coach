@@ -33,10 +33,13 @@ const DEMO_CREDENTIALS = {
 };
 
 const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-  admin: ['*'],
-  director: ['dashboard', 'meetings', 'whatsapp', 'teams', 'users', 'reports', 'integrations'],
-  supervisor: ['dashboard', 'meetings', 'whatsapp', 'teams', 'reports'],
-  member: ['dashboard', 'meetings', 'whatsapp'],
+  admin:       ['*'],
+  ceo:         ['*'],
+  director:    ['dashboard', 'meetings', 'whatsapp', 'performance', 'teams', 'areas', 'users', 'reports', 'integrations'],
+  manager:     ['dashboard', 'meetings', 'whatsapp', 'performance', 'teams', 'areas', 'users', 'reports'],
+  coordinator: ['dashboard', 'meetings', 'whatsapp', 'performance', 'teams', 'reports'],
+  supervisor:  ['dashboard', 'meetings', 'whatsapp', 'performance', 'teams', 'reports'],
+  member:      ['dashboard', 'meetings', 'whatsapp', 'performance'],
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
