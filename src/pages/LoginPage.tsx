@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Eye, EyeOff, Mail, Lock, TrendingUp, BarChart3, MessageSquare, Brain } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, TrendingUp, BarChart3, MessageSquare, Brain, ShieldCheck } from 'lucide-react';
 import heroBg from '@/assets/hero-bg.jpg';
 
 export default function LoginPage() {
@@ -18,12 +18,16 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { setError('Preencha todos os campos'); return; }
+    if (!email.toLowerCase().endsWith('@appmax.com.br')) {
+      setError('Apenas e-mails @appmax.com.br são permitidos.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
       await login(email, password);
-    } catch {
-      setError('Credenciais inválidas. Tente novamente.');
+    } catch (err: any) {
+      setError(err?.message ?? 'Credenciais inválidas. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -31,10 +35,11 @@ export default function LoginPage() {
 
   const handleGoogle = async () => {
     setLoading(true);
+    setError('');
     try {
       await loginWithGoogle();
-    } catch {
-      setError('Erro ao autenticar com Google.');
+    } catch (err: any) {
+      setError(err?.message ?? 'Erro ao autenticar com Google.');
     } finally {
       setLoading(false);
     }
@@ -193,29 +198,12 @@ export default function LoginPage() {
           </p>
 
           <div className="mt-8 p-4 rounded-lg bg-primary/5 border border-primary/20">
-            <p className="text-xs font-semibold text-foreground mb-2">
-              🔑 Credenciais de acesso
+            <p className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Acesso restrito
             </p>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground w-14">Email:</span>
-                <code className="text-xs text-primary font-mono">marcos.schuldz@appmax.com.br</code>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground w-14">Senha:</span>
-                <code className="text-xs text-primary font-mono">Appmax102030@</code>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="mt-3 w-full text-xs text-center text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
-              onClick={() => {
-                setEmail('marcos.schuldz@appmax.com.br');
-                setPassword('Appmax102030@');
-              }}
-            >
-              Preencher automaticamente →
-            </button>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Esta plataforma é exclusiva para colaboradores com e-mail <strong>@appmax.com.br</strong>. Contas de outros domínios serão bloqueadas automaticamente.
+            </p>
           </div>
         </div>
       </div>
