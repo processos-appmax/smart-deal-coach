@@ -1,18 +1,12 @@
 import { useState, useMemo } from 'react';
-import { TrendingUp, Users, User, Star, MessageSquare, Video, Brain, AlertTriangle, ChevronDown, Award, Target, BarChart3, Calendar } from 'lucide-react';
+import { TrendingUp, Users, User, MessageSquare, Video, Brain, ChevronDown, Award, BarChart3, Calendar, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MOCK_USERS, MOCK_TEAMS, MOCK_MEETINGS, MOCK_EVALUATIONS } from '@/data/mockData';
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend } from 'recharts';
 import { AI_CONFIG_STORAGE, DEFAULT_WHATSAPP_CRITERIA } from '@/pages/AIConfigPage';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function loadAiAnalysis(chatId: string) {
-  try {
-    const s = localStorage.getItem(`appmax_ai_analysis_${chatId}`);
-    return s ? JSON.parse(s) : null;
-  } catch { return null; }
-}
-
 function loadAllAiAnalyses(): { chatId: string; result: any }[] {
   const out: { chatId: string; result: any }[] = [];
   for (let i = 0; i < localStorage.length; i++) {
@@ -83,9 +77,39 @@ function MiniBar({ label, score, weight }: { label: string; score: number; weigh
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function PerformancePage() {
-  const [mode, setMode] = useState<'team' | 'person'>('person');
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(MOCK_TEAMS[0]?.id ?? '');
-  const [selectedUserId, setSelectedUserId] = useState<string>(MOCK_USERS[0]?.id ?? '');
+  const { user } = useAuth();
+  const role = user?.role ?? 'member';
+
+  // ── Determine which teams/users the current user can see ──────────────────
+  // admin/director → all teams & all users
+  // supervisor → only their own team
+  // member → only themselves
+  const visibleTeams = useMemo(() => {
+    if (role === 'admin' || role === 'director') return MOCK_TEAMS;
+    if (role === 'supervisor') return MOCK_TEAMS.filter(t => t.supervisorId === user?.id);
+    return []; // members cannot see team view
+  }, [role, user?.id]);
+
+  const visibleUsers = useMemo(() => {
+    if (role === 'admin' || role === 'director') return MOCK_USERS;
+    if (role === 'supervisor') {
+      const myTeam = MOCK_TEAMS.find(t => t.supervisorId === user?.id);
+      if (!myTeam) return MOCK_USERS.filter(u => u.id === user?.id);
+      return MOCK_USERS.filter(u => myTeam.memberIds.includes(u.id) || u.id === user?.id);
+    }
+    // member: only themselves
+    return MOCK_USERS.filter(u => u.id === user?.id);
+  }, [role, user?.id]);
+
+  // Members can only see person view; supervisors can switch; admins can switch
+  const canSeeTeam = role === 'admin' || role === 'director' || role === 'supervisor';
+  const canSeePerson = true;
+
+  const [mode, setMode] = useState<'team' | 'person'>(canSeeTeam ? 'person' : 'person');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(visibleTeams[0]?.id ?? '');
+  const [selectedUserId, setSelectedUserId] = useState<string>(
+    role === 'member' ? (user?.id ?? visibleUsers[0]?.id ?? '') : visibleUsers[0]?.id ?? ''
+  );
 
   const allAnalyses = useMemo(() => loadAllAiAnalyses(), []);
 
@@ -170,8 +194,13 @@ export default function PerformancePage() {
     return { team, members, avgOverall, totalMeetings, totalWaAnalyses };
   };
 
-  const userPerf = mode === 'person' ? buildUserPerf(selectedUserId) : null;
-  const teamPerf = mode === 'team' ? buildTeamPerf(selectedTeamId) : null;
+  // For members, always show their own profile regardless of selection
+  const effectiveUserId = role === 'member' ? (user?.id ?? selectedUserId) : selectedUserId;
+  // For supervisors with only one team, auto-use that team
+  const effectiveTeamId = visibleTeams.length === 1 ? visibleTeams[0].id : selectedTeamId;
+
+  const userPerf = mode === 'person' ? buildUserPerf(effectiveUserId) : null;
+  const teamPerf = mode === 'team' ? buildTeamPerf(effectiveTeamId) : null;
 
   return (
     <div className="page-container animate-fade-in">
@@ -186,46 +215,78 @@ export default function PerformancePage() {
         </div>
       </div>
 
+      {/* ── Role badge ── */}
+      {role === 'member' && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground">
+          <Lock className="w-3.5 h-3.5" />
+          Você está vendo apenas os seus próprios dados de desempenho.
+        </div>
+      )}
+      {role === 'supervisor' && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-primary">
+          <Users className="w-3.5 h-3.5" />
+          Você pode visualizar apenas os membros do seu time.
+        </div>
+      )}
+
       {/* ── Selector strip ── */}
       <div className="glass-card p-3 mb-5 flex items-center gap-3 flex-wrap">
-        {/* Mode toggle */}
-        <div className="flex gap-1 p-0.5 bg-secondary rounded-lg border border-border">
-          {(['person', 'team'] as const).map(m => (
-            <button key={m}
-              onClick={() => setMode(m)}
-              className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
-              {m === 'person' ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
-              {m === 'person' ? 'Vendedor' : 'Time'}
-            </button>
-          ))}
-        </div>
+        {/* Mode toggle — hidden for members (only person view) */}
+        {canSeeTeam && (
+          <div className="flex gap-1 p-0.5 bg-secondary rounded-lg border border-border">
+            {(['person', 'team'] as const).map(m => (
+              <button key={m}
+                onClick={() => setMode(m)}
+                className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                {m === 'person' ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
+                {m === 'person' ? 'Vendedor' : 'Time'}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Selector */}
+        {/* Selector — members see a static label, others get a dropdown */}
         {mode === 'person' ? (
-          <div className="relative">
-            <select
-              value={selectedUserId}
-              onChange={e => setSelectedUserId(e.target.value)}
-              className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
-              {MOCK_USERS.map(u => (
-                <option key={u.id} value={u.id}>{u.name} — {u.role === 'member' ? 'Vendedor' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'director' ? 'Diretor' : 'Admin'}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-3 h-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          role === 'member' ? (
+            <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-secondary border border-border text-xs text-foreground">
+              <User className="w-3.5 h-3.5 text-muted-foreground" />
+              {visibleUsers[0]?.name ?? 'Você'}
+            </div>
+          ) : (
+            <div className="relative">
+              <select
+                value={selectedUserId}
+                onChange={e => setSelectedUserId(e.target.value)}
+                className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
+                {visibleUsers.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} — {u.role === 'member' ? 'Vendedor' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'director' ? 'Diretor' : 'Admin'}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          )
         ) : (
-          <div className="relative">
-            <select
-              value={selectedTeamId}
-              onChange={e => setSelectedTeamId(e.target.value)}
-              className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
-              {MOCK_TEAMS.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-3 h-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          visibleTeams.length > 1 ? (
+            <div className="relative">
+              <select
+                value={selectedTeamId}
+                onChange={e => setSelectedTeamId(e.target.value)}
+                className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
+                {visibleTeams.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-secondary border border-border text-xs text-foreground">
+              <Users className="w-3.5 h-3.5 text-muted-foreground" />
+              {visibleTeams[0]?.name ?? 'Meu Time'}
+            </div>
+          )
         )}
       </div>
 
