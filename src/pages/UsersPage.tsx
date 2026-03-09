@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import {
   Plus, Search, Mail, MoreHorizontal, Trash2, UserX, UserCheck,
   UserPlus, Eye, EyeOff, Shield, SlidersHorizontal, AlertTriangle,
-  Smartphone, Wifi, WifiOff, Loader2
+  Smartphone, Wifi, WifiOff, Loader2, Link2, Link2Off
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
