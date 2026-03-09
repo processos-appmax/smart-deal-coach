@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import {
   Plus, Search, Mail, MoreHorizontal, Trash2, UserX, UserCheck,
   UserPlus, Eye, EyeOff, Shield, SlidersHorizontal, AlertTriangle,
-  Smartphone, Wifi, WifiOff, Loader2
+  Smartphone, Wifi, WifiOff, Loader2, Link2, Link2Off
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -425,6 +425,7 @@ export default function UsersPage() {
               <th className="text-left">Usuário</th>
               <th className="text-left hidden md:table-cell">Email</th>
               <th className="text-center hidden xl:table-cell">WhatsApp</th>
+              <th className="text-center hidden xl:table-cell">Google</th>
               <th className="text-center">Perfil</th>
               <th className="text-center">Status</th>
               <th className="text-center hidden lg:table-cell">Desde</th>
@@ -438,6 +439,8 @@ export default function UsersPage() {
               const instName = getInstanceForUser(u.id);
               const assignedInst = instances.find(i => i.name === instName);
               const isInstOpen = assignedInst?.connectionStatus === 'open';
+              // Google: persisted per user in localStorage by Google OAuth flow
+              const googleConnected = !!localStorage.getItem(`google_connected_${u.id}`);
               return (
                 <tr key={u.id} className={cn(u.status === 'inactive' && 'opacity-60')}>
                   <td>
@@ -467,6 +470,20 @@ export default function UsersPage() {
                       </div>
                     ) : (
                       <span className="text-[10px] text-muted-foreground/40">—</span>
+                    )}
+                  </td>
+                  {/* Google column */}
+                  <td className="hidden xl:table-cell text-center">
+                    {googleConnected ? (
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5 text-success" />
+                        <span className="text-[10px] text-success font-medium">Conectado</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Link2Off className="w-3.5 h-3.5 text-muted-foreground/40" />
+                        <span className="text-[10px] text-muted-foreground/40">Desconectado</span>
+                      </div>
                     )}
                   </td>
                   <td className="text-center">
