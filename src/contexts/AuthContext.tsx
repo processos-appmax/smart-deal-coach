@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserRole } from '@/types';
 import { ROLE_HIERARCHY } from '@/types';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
@@ -11,8 +11,6 @@ import {
 
 const ALLOWED_DOMAIN = (import.meta.env.VITE_GOOGLE_ALLOWED_DOMAIN || 'appmax.com.br').trim().toLowerCase();
 const SESSION_KEY = 'appmax_session';
-const ACTIVITY_KEY = 'appmax_last_activity';
-const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 export function isAppmaxEmail(email: string): boolean {
   return email.trim().toLowerCase().endsWith(`@${ALLOWED_DOMAIN}`);
@@ -54,24 +52,16 @@ function buildUser(
 
 function saveSession(user: User) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-  localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
 }
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem(ACTIVITY_KEY);
 }
 
 function loadSession(): User | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    const lastActivity = localStorage.getItem(ACTIVITY_KEY);
-    if (!raw || !lastActivity) return null;
-    const elapsed = Date.now() - parseInt(lastActivity, 10);
-    if (elapsed > INACTIVITY_TIMEOUT_MS) {
-      clearSession();
-      return null;
-    }
+    if (!raw) return null;
     return JSON.parse(raw) as User;
   } catch {
     clearSession();
@@ -79,47 +69,20 @@ function loadSession(): User | null {
   }
 }
 
-function touchActivity() {
-  localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { canAccess: roleCanAccess } = useRolePermissions();
   const { addEvent } = useAuditLog();
-  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const resetInactivityTimer = useCallback(() => {
-    touchActivity();
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    inactivityTimer.current = setTimeout(() => {
-      clearSession();
-      setUser(null);
-    }, INACTIVITY_TIMEOUT_MS);
-  }, []);
 
   // Restore session on mount
   useEffect(() => {
     const restored = loadSession();
     if (restored) {
       setUser(restored);
-      resetInactivityTimer();
     }
     setIsLoading(false);
-  }, [resetInactivityTimer]);
-
-  // Track user activity (mouse, keyboard, touch, scroll)
-  useEffect(() => {
-    if (!user) return;
-    const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
-    const handler = () => resetInactivityTimer();
-    events.forEach(e => window.addEventListener(e, handler, { passive: true }));
-    return () => {
-      events.forEach(e => window.removeEventListener(e, handler));
-      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    };
-  }, [user, resetInactivityTimer]);
+  }, []);
 
   const recordLogin = (u: User) => {
     addEvent({
@@ -162,7 +125,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       setUser(u);
       saveSession(u);
-      resetInactivityTimer();
       recordLogin(u);
     } finally {
       setIsLoading(false);
@@ -197,7 +159,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setUser(u);
     saveSession(u);
-    resetInactivityTimer();
     recordLogin(u);
   };
 
@@ -214,7 +175,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }
     clearSession();
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     setUser(null);
   };
 
