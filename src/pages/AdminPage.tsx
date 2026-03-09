@@ -86,6 +86,14 @@ export default function AdminPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole>('ceo');
   const [expandedRole, setExpandedRole] = useState<UserRole | null>('ceo');
 
+  // OAuth settings state
+  const [oauthClientId, setOauthClientId] = useState(() => loadOAuthSetting(GOOG_KEY));
+  const [oauthClientSecret, setOauthClientSecret] = useState(() => loadOAuthSetting(GOOG_SECRET));
+  const [oauthSaved, setOauthSaved] = useState(false);
+  const [showOauthSecret, setShowOauthSecret] = useState(false);
+  const [showOauthClientId, setShowOauthClientId] = useState(false);
+  const APP_URL = window.location.origin;
+  const CALLBACK_URL = `${APP_URL}/auth/google/callback`;
   // Audit logs state
   const [logs, setLogs] = useState<AuditEvent[]>([]);
   const [logSearch, setLogSearch] = useState('');
