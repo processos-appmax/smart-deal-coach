@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MOCK_USERS } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
+import { useGoogleLogin } from '@react-oauth/google';
+import { GOOGLE_CLIENT_ID } from '@/App';
 import {
   RefreshCw, Loader2, Smartphone, QrCode, MessageSquare,
   Phone, Wifi, WifiOff, X, CheckCircle2, XCircle,
-  Calendar, Video, HardDrive, LogIn, LogOut, ShieldCheck,
+  Calendar, Video, HardDrive, LogOut, ShieldCheck,
   AlertTriangle, Activity, ArrowDown, ArrowUp, CheckCheck,
   ExternalLink
 } from 'lucide-react';
@@ -54,6 +56,7 @@ interface GoogleSession {
   picture?: string;
   connectedAt: string;
   services: GoogleServiceId[];
+  accessToken?: string;
 }
 
 // localStorage helpers for Google session
@@ -127,42 +130,78 @@ function GooglePanel() {
   const [session, setSession] = useState<GoogleSession | null>(() => getGoogleSession(userId));
   const [connecting, setConnecting] = useState(false);
 
-  // Simulate Google OAuth popup + domain check
-  const handleConnect = async () => {
-    setConnecting(true);
-    // Simulate OAuth round-trip (1.2s)
-    await new Promise(r => setTimeout(r, 1200));
+  const hasClientId = !!GOOGLE_CLIENT_ID;
 
-    // In production: open Google OAuth popup with hd=appmax.com.br param
-    // and validate the returned id_token email domain server-side.
-    // Here we simulate a successful login with the current user's email.
-    const simulatedEmail = user?.email ?? '';
+  const googleLogin = useGoogleLogin({
+    scope: [
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/drive.readonly',
+      'openid email profile',
+    ].join(' '),
+    // Restrict to appmax.com.br domain
+    hosted_domain: 'appmax.com.br',
+    onSuccess: async (tokenResponse) => {
+      try {
+        // Fetch user info from Google
+        const infoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const info = await infoRes.json();
 
-    if (!simulatedEmail.endsWith(`@${ALLOWED_DOMAIN}`)) {
+        // Enforce domain restriction server-side (even though hd= hint is set)
+        if (!info.email?.endsWith('@appmax.com.br')) {
+          toast({
+            variant: 'destructive',
+            title: 'Domínio não autorizado',
+            description: 'Apenas contas @appmax.com.br podem conectar ao Google.',
+          });
+          setConnecting(false);
+          return;
+        }
+
+        const newSession: GoogleSession = {
+          email: info.email,
+          name: info.name || info.email,
+          picture: info.picture,
+          connectedAt: new Date().toISOString(),
+          services: ['calendar', 'meet', 'drive'],
+          accessToken: tokenResponse.access_token,
+        };
+
+        saveGoogleSession(userId, newSession);
+        setSession(newSession);
+        toast({
+          title: 'Google conectado com sucesso!',
+          description: `${info.name} — Calendar, Meet e Drive sincronizados.`,
+        });
+      } catch {
+        toast({ variant: 'destructive', title: 'Erro ao obter informações do Google.' });
+      } finally {
+        setConnecting(false);
+      }
+    },
+    onError: (err) => {
+      console.error(err);
+      toast({ variant: 'destructive', title: 'Autenticação cancelada ou erro no Google.' });
+      setConnecting(false);
+    },
+    onNonOAuthError: () => {
+      toast({ variant: 'destructive', title: 'Popup bloqueado pelo navegador. Permita popups e tente novamente.' });
+      setConnecting(false);
+    },
+  });
+
+  const handleConnect = () => {
+    if (!hasClientId) {
       toast({
         variant: 'destructive',
-        title: 'Domínio não autorizado',
-        description: `Apenas contas @${ALLOWED_DOMAIN} podem conectar ao Google.`,
+        title: 'Client ID não configurado',
+        description: 'Adicione VITE_GOOGLE_CLIENT_ID nas variáveis de ambiente do projeto.',
       });
-      setConnecting(false);
       return;
     }
-
-    const newSession: GoogleSession = {
-      email: simulatedEmail,
-      name: user?.name ?? simulatedEmail,
-      picture: user?.avatar,
-      connectedAt: new Date().toISOString(),
-      services: ['calendar', 'meet', 'drive'],
-    };
-
-    saveGoogleSession(userId, newSession);
-    setSession(newSession);
-    setConnecting(false);
-    toast({
-      title: 'Google conectado com sucesso!',
-      description: 'Calendar, Meet e Drive estão sincronizados.',
-    });
+    setConnecting(true);
+    googleLogin();
   };
 
   const handleDisconnect = () => {
@@ -173,6 +212,23 @@ function GooglePanel() {
 
   return (
     <div className="space-y-5">
+      {/* Missing Client ID warning */}
+      {!hasClientId && (
+        <div className="p-4 rounded-xl border border-warning/30 bg-warning/5 flex items-start gap-3">
+          <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-semibold text-warning mb-1">Client ID do Google não configurado</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Para ativar o OAuth real, adicione a variável <code className="bg-muted px-1 rounded font-mono">VITE_GOOGLE_CLIENT_ID</code> nas configurações do projeto com o Client ID gerado no Google Cloud Console.
+            </p>
+            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-1.5">
+              Abrir Google Cloud Console <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Header card */}
       <div className="glass-card p-5" style={{ background: 'linear-gradient(135deg, hsl(210 100% 56% / 0.06), hsl(168 80% 42% / 0.04))' }}>
         <div className="flex items-start justify-between flex-wrap gap-4">
