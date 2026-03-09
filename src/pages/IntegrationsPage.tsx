@@ -56,6 +56,7 @@ interface GoogleSession {
   picture?: string;
   connectedAt: string;
   services: GoogleServiceId[];
+  accessToken?: string;
 }
 
 // localStorage helpers for Google session
