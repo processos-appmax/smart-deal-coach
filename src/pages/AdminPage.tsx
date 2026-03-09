@@ -427,54 +427,86 @@ export default function AdminPage() {
           {section === 'api-keys' && (
             <div className="glass-card p-6 space-y-5">
               <div>
-                <h2 className="font-display font-semibold text-lg">Tokens OpenAI por Módulo</h2>
+                <h2 className="font-display font-semibold text-lg">Tokens & Modelos de IA por Módulo</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Configure chaves separadas por funcionalidade para controle granular de custos.
+                  Configure a chave de API e o modelo de IA para cada funcionalidade do sistema.
                 </p>
               </div>
               <div className="space-y-4">
-                {TOKEN_FIELDS.map(f => (
-                  <div key={f.key} className="p-4 rounded-xl bg-muted/30 border border-border/50 space-y-2">
-                    <div>
-                      <label className="text-xs font-semibold flex items-center gap-1.5 mb-0.5">
-                        <span>{f.icon}</span> {f.label}
-                      </label>
-                      <p className="text-[10px] text-muted-foreground">{f.desc}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Input
-                          type={showKey[f.key] ? 'text' : 'password'}
-                          value={tokens[f.key]}
-                          onChange={e => setToken(f.key, e.target.value)}
-                          placeholder="sk-proj-..."
-                          className="h-9 text-xs bg-secondary border-border pr-10 font-mono"
-                        />
-                        <button
-                          onClick={() => toggleKey(f.key)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                {TOKEN_FIELDS.map(f => {
+                  const currentModel = models[f.key as ModuleAIKey];
+                  const modelInfo = AI_MODELS.find(m => m.id === currentModel);
+                  return (
+                    <div key={f.key} className="p-4 rounded-xl bg-muted/30 border border-border/50 space-y-3">
+                      {/* Header */}
+                      <div>
+                        <label className="text-xs font-semibold flex items-center gap-1.5 mb-0.5">
+                          <span>{f.icon}</span> {f.label}
+                        </label>
+                        <p className="text-[10px] text-muted-foreground">{f.desc}</p>
+                      </div>
+
+                      {/* Model selector */}
+                      <div>
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Modelo de IA</p>
+                        <select
+                          value={currentModel}
+                          onChange={e => setModuleModel(f.key as ModuleAIKey, e.target.value as any)}
+                          className="w-full text-xs bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
                         >
-                          {showKey[f.key] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
+                          {AI_MODELS.map(m => (
+                            <option key={m.id} value={m.id}>
+                              {m.badge}  {m.label} — {m.desc}
+                            </option>
+                          ))}
+                        </select>
+                        {modelInfo && (
+                          <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                            <span>{modelInfo.badge}</span>
+                            <span className="font-mono text-primary/70">{modelInfo.id}</span>
+                          </p>
+                        )}
                       </div>
-                      <div className={cn(
-                        'flex items-center px-2 rounded-lg text-[10px] font-medium border',
-                        tokens[f.key].startsWith('sk-')
-                          ? 'bg-success/10 text-success border-success/20'
-                          : 'bg-muted text-muted-foreground border-border'
-                      )}>
-                        {tokens[f.key].startsWith('sk-') ? '✓ OK' : 'Vazio'}
+
+                      {/* Token input */}
+                      <div>
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Chave de API</p>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Input
+                              type={showKey[f.key] ? 'text' : 'password'}
+                              value={tokens[f.key]}
+                              onChange={e => setToken(f.key, e.target.value)}
+                              placeholder="sk-proj-..."
+                              className="h-9 text-xs bg-secondary border-border pr-10 font-mono"
+                            />
+                            <button
+                              onClick={() => toggleKey(f.key)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                            >
+                              {showKey[f.key] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                          <div className={cn(
+                            'flex items-center px-2 rounded-lg text-[10px] font-medium border whitespace-nowrap',
+                            tokens[f.key].startsWith('sk-')
+                              ? 'bg-success/10 text-success border-success/20'
+                              : 'bg-muted text-muted-foreground border-border'
+                          )}>
+                            {tokens[f.key].startsWith('sk-') ? '✓ OK' : 'Vazio'}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
                   <p className="text-xs text-muted-foreground">
-                    🔐 As chaves ficam salvas no armazenamento local do seu dispositivo.
+                    🔐 As chaves e modelos ficam salvos no armazenamento local do seu dispositivo.
                   </p>
                 </div>
                 <Button size="sm" className="bg-gradient-primary text-xs" onClick={handleSaveTokens}>
-                  <Save className="w-3 h-3 mr-1" /> Salvar Tokens
+                  <Save className="w-3 h-3 mr-1" /> Salvar Configurações
                 </Button>
               </div>
             </div>
