@@ -122,6 +122,19 @@ export default function AdminPage() {
     toast({ title: 'Tokens salvos', description: 'Configurações de API atualizadas com sucesso.' });
   };
 
+  const handleSaveOAuth = () => {
+    saveOAuthSetting(GOOG_KEY, oauthClientId.trim());
+    saveOAuthSetting(GOOG_SECRET, oauthClientSecret.trim());
+    setOauthSaved(true);
+    setTimeout(() => setOauthSaved(false), 3000);
+    toast({ title: 'Credenciais salvas', description: 'Google Client ID e Secret armazenados com segurança.' });
+  };
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: `${label} copiada!` });
+  };
+
   const isLocked = (id: ModuleId) => id === 'admin';
 
   const targetDisabled = moduleTarget === 'global' ? [] : getUserDisabledModules(moduleTarget);
