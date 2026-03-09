@@ -12,6 +12,31 @@ export interface ModuleConfig {
   enabled: boolean; // global default
 }
 
+export type AIModelId =
+  | 'openai/gpt-5'
+  | 'openai/gpt-5-mini'
+  | 'openai/gpt-5-nano'
+  | 'openai/gpt-5.2'
+  | 'google/gemini-2.5-pro'
+  | 'google/gemini-3.1-pro-preview'
+  | 'google/gemini-3-flash-preview'
+  | 'google/gemini-2.5-flash'
+  | 'google/gemini-2.5-flash-lite';
+
+export const AI_MODELS: { id: AIModelId; label: string; desc: string; badge: string }[] = [
+  { id: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash (padrão)', desc: 'Rápido e eficiente — melhor custo-benefício',           badge: '⚡ Recomendado' },
+  { id: 'google/gemini-2.5-flash',       label: 'Gemini 2.5 Flash',        desc: 'Balanceado — multimodal + raciocínio',                  badge: '⚖️ Balanceado' },
+  { id: 'google/gemini-2.5-pro',         label: 'Gemini 2.5 Pro',          desc: 'Máximo desempenho em raciocínio e contexto grande',     badge: '🏆 Premium' },
+  { id: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview',  desc: 'Próxima geração do Google — raciocínio avançado',       badge: '🔬 Preview' },
+  { id: 'google/gemini-2.5-flash-lite',  label: 'Gemini 2.5 Flash Lite',   desc: 'Mais rápido e barato — tarefas simples',                badge: '🚀 Econômico' },
+  { id: 'openai/gpt-5',                  label: 'GPT-5',                   desc: 'Poderoso — raciocínio e multimodal de alto nível',      badge: '🧠 OpenAI' },
+  { id: 'openai/gpt-5-mini',             label: 'GPT-5 Mini',              desc: 'Menor custo com forte desempenho',                      badge: '💡 OpenAI' },
+  { id: 'openai/gpt-5-nano',             label: 'GPT-5 Nano',              desc: 'Ultra rápido — tarefas simples e alto volume',          badge: '⚡ OpenAI' },
+  { id: 'openai/gpt-5.2',               label: 'GPT-5.2',                  desc: 'Mais recente da OpenAI — raciocínio complexo aprimorado', badge: '🆕 OpenAI' },
+];
+
+export type ModuleAIKey = 'meetings' | 'training' | 'whatsapp' | 'reports' | 'automations';
+
 export interface OpenAITokens {
   meetings: string;
   training: string;
@@ -20,18 +45,20 @@ export interface OpenAITokens {
   automations: string;
 }
 
+export type ModuleModels = Record<ModuleAIKey, AIModelId>;
+
 // Per-user or per-team module overrides: key = userId or teamId, value = set of disabled module ids
 export type ModuleOverrides = Record<string, Set<ModuleId>>;
 
 interface AppConfigContextType {
   tokens: OpenAITokens;
+  models: ModuleModels;
   modules: ModuleConfig[];
-  // per-user overrides stored as Record<userId|teamId, ModuleId[]>
   userModuleOverrides: Record<string, ModuleId[]>;
   setToken: (module: keyof OpenAITokens, value: string) => void;
+  setModuleModel: (module: ModuleAIKey, model: AIModelId) => void;
   setModuleEnabled: (id: ModuleId, enabled: boolean) => void;
   isModuleEnabled: (id: ModuleId) => boolean;
-  // Per-entity overrides
   setUserModuleOverride: (entityId: string, disabledModules: ModuleId[]) => void;
   getUserDisabledModules: (entityId: string) => ModuleId[];
   isModuleEnabledForUser: (moduleId: ModuleId, userId: string, teamId?: string) => boolean;
@@ -61,8 +88,17 @@ export const DEFAULT_MODULES: ModuleConfig[] = [
 ];
 
 const STORAGE_KEY_TOKENS    = 'appmax_openai_tokens';
+const STORAGE_KEY_MODELS    = 'appmax_ai_models';
 const STORAGE_KEY_MODULES   = 'appmax_modules_config';
 const STORAGE_KEY_OVERRIDES = 'appmax_user_module_overrides';
+
+const DEFAULT_MODELS: ModuleModels = {
+  meetings:    'google/gemini-3-flash-preview',
+  training:    'google/gemini-3-flash-preview',
+  whatsapp:    'google/gemini-3-flash-preview',
+  reports:     'google/gemini-3-flash-preview',
+  automations: 'google/gemini-3-flash-preview',
+};
 
 const AppConfigContext = createContext<AppConfigContextType | null>(null);
 
@@ -72,6 +108,13 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY_TOKENS);
       return stored ? { ...DEFAULT_TOKENS, ...JSON.parse(stored) } : DEFAULT_TOKENS;
     } catch { return DEFAULT_TOKENS; }
+  });
+
+  const [models, setModels] = useState<ModuleModels>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_MODELS);
+      return stored ? { ...DEFAULT_MODELS, ...JSON.parse(stored) } : DEFAULT_MODELS;
+    } catch { return DEFAULT_MODELS; }
   });
 
   const [modules, setModules] = useState<ModuleConfig[]>(() => {
@@ -95,6 +138,10 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
 
   const setToken = (module: keyof OpenAITokens, value: string) => {
     setTokens(prev => ({ ...prev, [module]: value }));
+  };
+
+  const setModuleModel = (module: ModuleAIKey, model: AIModelId) => {
+    setModels(prev => ({ ...prev, [module]: model }));
   };
 
   const setModuleEnabled = (id: ModuleId, enabled: boolean) => {
@@ -141,10 +188,14 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(STORAGE_KEY_OVERRIDES, JSON.stringify(userModuleOverrides));
   }, [userModuleOverrides]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_MODELS, JSON.stringify(models));
+  }, [models]);
+
   return (
     <AppConfigContext.Provider value={{
-      tokens, modules, userModuleOverrides,
-      setToken, setModuleEnabled, isModuleEnabled,
+      tokens, models, modules, userModuleOverrides,
+      setToken, setModuleModel, setModuleEnabled, isModuleEnabled,
       setUserModuleOverride, getUserDisabledModules, isModuleEnabledForUser,
       saveConfig,
     }}>
