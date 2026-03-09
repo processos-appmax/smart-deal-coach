@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MOCK_USERS, MOCK_TEAMS, MOCK_AREAS } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,8 @@ import {
   ChevronRight, CheckCircle2, AlertCircle, Save, Eye, EyeOff,
   Lock, ToggleLeft, ToggleRight, SlidersHorizontal,
   Layers, Plus, Trash2, ChevronDown, ChevronUp, GitBranch,
+  ScrollText, LogIn, LogOut, MonitorSmartphone, Search, RefreshCw, Trash,
+  Filter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppConfig, DEFAULT_MODULES, type ModuleId } from '@/contexts/AppConfigContext';
@@ -20,6 +22,7 @@ import {
 } from '@/contexts/RolePermissionsContext';
 import type { UserRole, ResourceId } from '@/types';
 import { ROLE_LABELS, ROLE_HIERARCHY } from '@/types';
+import { useAuditLog, type AuditEvent, type AuditEventType } from '@/contexts/AuditLogContext';
 
 const ADMIN_SECTIONS = [
   { id: 'company',    label: 'Empresa',              icon: Building2 },
@@ -28,6 +31,7 @@ const ADMIN_SECTIONS = [
   { id: 'api-keys',   label: 'Tokens OpenAI',        icon: Key },
   { id: 'modules',    label: 'Módulos Visíveis',     icon: ToggleRight },
   { id: 'security',   label: 'Segurança & RLS',      icon: Lock },
+  { id: 'logs',       label: 'Logs de Acesso',       icon: ScrollText },
 ];
 
 const TOKEN_FIELDS: { key: keyof import('@/contexts/AppConfigContext').OpenAITokens; label: string; desc: string; icon: string }[] = [
