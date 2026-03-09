@@ -470,6 +470,20 @@ export default function UsersPage() {
                       <span className="text-[10px] text-muted-foreground/40">—</span>
                     )}
                   </td>
+                  {/* Google column */}
+                  <td className="hidden xl:table-cell text-center">
+                    {googleConnected ? (
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5 text-success" />
+                        <span className="text-[10px] text-success font-medium">Conectado</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Link2Off className="w-3.5 h-3.5 text-muted-foreground/40" />
+                        <span className="text-[10px] text-muted-foreground/40">Desconectado</span>
+                      </div>
+                    )}
+                  </td>
                   <td className="text-center">
                     <span className={cn('text-xs px-2.5 py-0.5 rounded-full border font-medium', rc.class)}>{rc.label}</span>
                   </td>
