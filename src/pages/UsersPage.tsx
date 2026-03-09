@@ -245,12 +245,12 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
               {loadingInst && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
             </div>
 
-            <Select value={selectedInstance} onValueChange={setSelectedInstance}>
+            <Select value={selectedInstance || '__none__'} onValueChange={v => setSelectedInstance(v === '__none__' ? '' : v)}>
               <SelectTrigger className="h-9 text-xs bg-secondary border-border">
                 <SelectValue placeholder={loadingInst ? 'Carregando instâncias...' : 'Selecionar instância...'} />
               </SelectTrigger>
               <SelectContent className="bg-card border-border max-h-60">
-                <SelectItem value="" className="text-xs text-muted-foreground">— Sem instância —</SelectItem>
+                <SelectItem value="__none__" className="text-xs text-muted-foreground">— Sem instância —</SelectItem>
                 {instances.map(inst => {
                   const isOpen = inst.connectionStatus === 'open';
                   const phone = inst.ownerJid?.replace('@s.whatsapp.net', '');
