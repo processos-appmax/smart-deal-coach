@@ -22,10 +22,13 @@ import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { useEvolutionInstances, getInstanceForUser, setInstanceForUser } from '@/hooks/useEvolutionInstances';
 
 const ROLE_CONFIG: Record<UserRole, { label: string; class: string }> = {
-  admin:      { label: 'Admin',      class: 'bg-destructive/10 text-destructive border-destructive/20' },
-  director:   { label: 'Diretor',    class: 'bg-primary/10 text-primary border-primary/20' },
-  supervisor: { label: 'Supervisor', class: 'bg-accent/10 text-accent border-accent/20' },
-  member:     { label: 'Vendedor',   class: 'bg-muted text-muted-foreground border-border' },
+  admin:       { label: 'Admin',        class: 'bg-destructive/10 text-destructive border-destructive/20' },
+  ceo:         { label: 'CEO',          class: 'bg-destructive/10 text-destructive border-destructive/30' },
+  director:    { label: 'Diretor',      class: 'bg-primary/10 text-primary border-primary/20' },
+  manager:     { label: 'Gerente',      class: 'bg-accent/15 text-accent border-accent/30' },
+  coordinator: { label: 'Coordenador',  class: 'bg-warning/10 text-warning border-warning/20' },
+  supervisor:  { label: 'Supervisor',   class: 'bg-success/10 text-success border-success/20' },
+  member:      { label: 'Vendedor',     class: 'bg-muted text-muted-foreground border-border' },
 };
 
 // ─── Create user modal ────────────────────────────────────────────────────────
