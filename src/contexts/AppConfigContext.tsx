@@ -12,6 +12,31 @@ export interface ModuleConfig {
   enabled: boolean; // global default
 }
 
+export type AIModelId =
+  | 'openai/gpt-5'
+  | 'openai/gpt-5-mini'
+  | 'openai/gpt-5-nano'
+  | 'openai/gpt-5.2'
+  | 'google/gemini-2.5-pro'
+  | 'google/gemini-3.1-pro-preview'
+  | 'google/gemini-3-flash-preview'
+  | 'google/gemini-2.5-flash'
+  | 'google/gemini-2.5-flash-lite';
+
+export const AI_MODELS: { id: AIModelId; label: string; desc: string; badge: string }[] = [
+  { id: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash (padrão)', desc: 'Rápido e eficiente — melhor custo-benefício',           badge: '⚡ Recomendado' },
+  { id: 'google/gemini-2.5-flash',       label: 'Gemini 2.5 Flash',        desc: 'Balanceado — multimodal + raciocínio',                  badge: '⚖️ Balanceado' },
+  { id: 'google/gemini-2.5-pro',         label: 'Gemini 2.5 Pro',          desc: 'Máximo desempenho em raciocínio e contexto grande',     badge: '🏆 Premium' },
+  { id: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview',  desc: 'Próxima geração do Google — raciocínio avançado',       badge: '🔬 Preview' },
+  { id: 'google/gemini-2.5-flash-lite',  label: 'Gemini 2.5 Flash Lite',   desc: 'Mais rápido e barato — tarefas simples',                badge: '🚀 Econômico' },
+  { id: 'openai/gpt-5',                  label: 'GPT-5',                   desc: 'Poderoso — raciocínio e multimodal de alto nível',      badge: '🧠 OpenAI' },
+  { id: 'openai/gpt-5-mini',             label: 'GPT-5 Mini',              desc: 'Menor custo com forte desempenho',                      badge: '💡 OpenAI' },
+  { id: 'openai/gpt-5-nano',             label: 'GPT-5 Nano',              desc: 'Ultra rápido — tarefas simples e alto volume',          badge: '⚡ OpenAI' },
+  { id: 'openai/gpt-5.2',               label: 'GPT-5.2',                  desc: 'Mais recente da OpenAI — raciocínio complexo aprimorado', badge: '🆕 OpenAI' },
+];
+
+export type ModuleAIKey = 'meetings' | 'training' | 'whatsapp' | 'reports' | 'automations';
+
 export interface OpenAITokens {
   meetings: string;
   training: string;
@@ -19,6 +44,8 @@ export interface OpenAITokens {
   reports: string;
   automations: string;
 }
+
+export type ModuleModels = Record<ModuleAIKey, AIModelId>;
 
 // Per-user or per-team module overrides: key = userId or teamId, value = set of disabled module ids
 export type ModuleOverrides = Record<string, Set<ModuleId>>;
