@@ -129,42 +129,78 @@ function GooglePanel() {
   const [session, setSession] = useState<GoogleSession | null>(() => getGoogleSession(userId));
   const [connecting, setConnecting] = useState(false);
 
-  // Simulate Google OAuth popup + domain check
-  const handleConnect = async () => {
-    setConnecting(true);
-    // Simulate OAuth round-trip (1.2s)
-    await new Promise(r => setTimeout(r, 1200));
+  const hasClientId = !!GOOGLE_CLIENT_ID;
 
-    // In production: open Google OAuth popup with hd=appmax.com.br param
-    // and validate the returned id_token email domain server-side.
-    // Here we simulate a successful login with the current user's email.
-    const simulatedEmail = user?.email ?? '';
+  const googleLogin = useGoogleLogin({
+    scope: [
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/drive.readonly',
+      'openid email profile',
+    ].join(' '),
+    // Restrict to appmax.com.br domain
+    hosted_domain: 'appmax.com.br',
+    onSuccess: async (tokenResponse) => {
+      try {
+        // Fetch user info from Google
+        const infoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const info = await infoRes.json();
 
-    if (!simulatedEmail.endsWith(`@${ALLOWED_DOMAIN}`)) {
+        // Enforce domain restriction server-side (even though hd= hint is set)
+        if (!info.email?.endsWith('@appmax.com.br')) {
+          toast({
+            variant: 'destructive',
+            title: 'Domínio não autorizado',
+            description: 'Apenas contas @appmax.com.br podem conectar ao Google.',
+          });
+          setConnecting(false);
+          return;
+        }
+
+        const newSession: GoogleSession = {
+          email: info.email,
+          name: info.name || info.email,
+          picture: info.picture,
+          connectedAt: new Date().toISOString(),
+          services: ['calendar', 'meet', 'drive'],
+          accessToken: tokenResponse.access_token,
+        };
+
+        saveGoogleSession(userId, newSession);
+        setSession(newSession);
+        toast({
+          title: 'Google conectado com sucesso!',
+          description: `${info.name} — Calendar, Meet e Drive sincronizados.`,
+        });
+      } catch {
+        toast({ variant: 'destructive', title: 'Erro ao obter informações do Google.' });
+      } finally {
+        setConnecting(false);
+      }
+    },
+    onError: (err) => {
+      console.error(err);
+      toast({ variant: 'destructive', title: 'Autenticação cancelada ou erro no Google.' });
+      setConnecting(false);
+    },
+    onNonOAuthError: () => {
+      toast({ variant: 'destructive', title: 'Popup bloqueado pelo navegador. Permita popups e tente novamente.' });
+      setConnecting(false);
+    },
+  });
+
+  const handleConnect = () => {
+    if (!hasClientId) {
       toast({
         variant: 'destructive',
-        title: 'Domínio não autorizado',
-        description: `Apenas contas @${ALLOWED_DOMAIN} podem conectar ao Google.`,
+        title: 'Client ID não configurado',
+        description: 'Adicione VITE_GOOGLE_CLIENT_ID nas variáveis de ambiente do projeto.',
       });
-      setConnecting(false);
       return;
     }
-
-    const newSession: GoogleSession = {
-      email: simulatedEmail,
-      name: user?.name ?? simulatedEmail,
-      picture: user?.avatar,
-      connectedAt: new Date().toISOString(),
-      services: ['calendar', 'meet', 'drive'],
-    };
-
-    saveGoogleSession(userId, newSession);
-    setSession(newSession);
-    setConnecting(false);
-    toast({
-      title: 'Google conectado com sucesso!',
-      description: 'Calendar, Meet e Drive estão sincronizados.',
-    });
+    setConnecting(true);
+    googleLogin();
   };
 
   const handleDisconnect = () => {
