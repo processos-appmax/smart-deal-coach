@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useGoogleLogin } from '@react-oauth/google';
-import { GOOGLE_CLIENT_ID } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,10 +18,6 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { setError('Preencha todos os campos'); return; }
-    if (!email.toLowerCase().endsWith('@appmax.com.br')) {
-      setError('Apenas e-mails @appmax.com.br são permitidos.');
-      return;
-    }
     setError('');
     setLoading(true);
     try {
@@ -35,41 +29,16 @@ export default function LoginPage() {
     }
   };
 
-  // Real Google OAuth — opens Google consent popup
-  const googleLogin = useGoogleLogin({
-    scope: 'openid email profile',
-    hosted_domain: 'appmax.com.br',   // hints Google to pre-select @appmax.com.br accounts
-    onSuccess: async (tokenResponse) => {
-      try {
-        const infoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const info = await infoRes.json();
-        await loginWithGoogle({ email: info.email, name: info.name, picture: info.picture });
-      } catch (err: any) {
-        setError(err?.message ?? 'Erro ao obter dados do Google.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    onError: () => {
-      setError('Autenticação cancelada ou erro no Google.');
-      setLoading(false);
-    },
-    onNonOAuthError: () => {
-      setError('Popup bloqueado. Permita popups para este site e tente novamente.');
-      setLoading(false);
-    },
-  });
-
-  const handleGoogle = () => {
-    if (!GOOGLE_CLIENT_ID) {
-      setError('Google OAuth não configurado. Fale com o administrador do sistema.');
-      return;
-    }
+  const handleGoogle = async () => {
     setError('');
     setLoading(true);
-    googleLogin();
+    try {
+      await loginWithGoogle();
+      // loginWithGoogle triggers a redirect, so loading stays true
+    } catch (err: any) {
+      setError(err?.message ?? 'Erro ao iniciar autenticação com Google.');
+      setLoading(false);
+    }
   };
 
   const features = [
@@ -151,7 +120,7 @@ export default function LoginPage() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            Continuar com Google
+            {loading ? 'Redirecionando...' : 'Continuar com Google'}
           </Button>
 
           <div className="flex items-center gap-4 mb-6">
@@ -168,7 +137,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="seu@email.com"
+                  placeholder="seu@appmax.com.br"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10 h-11 bg-input border-border"
@@ -216,13 +185,6 @@ export default function LoginPage() {
               {loading ? 'Entrando...' : 'Entrar na plataforma'}
             </Button>
           </form>
-
-          <p className="text-center text-xs text-muted-foreground mt-6">
-            Não tem uma conta?{' '}
-            <button className="text-primary hover:underline font-medium">
-              Solicitar acesso
-            </button>
-          </p>
 
           <div className="mt-8 p-4 rounded-lg bg-primary/5 border border-primary/20">
             <p className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
