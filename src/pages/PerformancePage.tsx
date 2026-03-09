@@ -1,18 +1,12 @@
 import { useState, useMemo } from 'react';
-import { TrendingUp, Users, User, Star, MessageSquare, Video, Brain, AlertTriangle, ChevronDown, Award, Target, BarChart3, Calendar } from 'lucide-react';
+import { TrendingUp, Users, User, MessageSquare, Video, Brain, ChevronDown, Award, BarChart3, Calendar, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MOCK_USERS, MOCK_TEAMS, MOCK_MEETINGS, MOCK_EVALUATIONS } from '@/data/mockData';
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend } from 'recharts';
 import { AI_CONFIG_STORAGE, DEFAULT_WHATSAPP_CRITERIA } from '@/pages/AIConfigPage';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function loadAiAnalysis(chatId: string) {
-  try {
-    const s = localStorage.getItem(`appmax_ai_analysis_${chatId}`);
-    return s ? JSON.parse(s) : null;
-  } catch { return null; }
-}
-
 function loadAllAiAnalyses(): { chatId: string; result: any }[] {
   const out: { chatId: string; result: any }[] = [];
   for (let i = 0; i < localStorage.length; i++) {
@@ -83,9 +77,39 @@ function MiniBar({ label, score, weight }: { label: string; score: number; weigh
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function PerformancePage() {
-  const [mode, setMode] = useState<'team' | 'person'>('person');
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(MOCK_TEAMS[0]?.id ?? '');
-  const [selectedUserId, setSelectedUserId] = useState<string>(MOCK_USERS[0]?.id ?? '');
+  const { user } = useAuth();
+  const role = user?.role ?? 'member';
+
+  // ── Determine which teams/users the current user can see ──────────────────
+  // admin/director → all teams & all users
+  // supervisor → only their own team
+  // member → only themselves
+  const visibleTeams = useMemo(() => {
+    if (role === 'admin' || role === 'director') return MOCK_TEAMS;
+    if (role === 'supervisor') return MOCK_TEAMS.filter(t => t.supervisorId === user?.id);
+    return []; // members cannot see team view
+  }, [role, user?.id]);
+
+  const visibleUsers = useMemo(() => {
+    if (role === 'admin' || role === 'director') return MOCK_USERS;
+    if (role === 'supervisor') {
+      const myTeam = MOCK_TEAMS.find(t => t.supervisorId === user?.id);
+      if (!myTeam) return MOCK_USERS.filter(u => u.id === user?.id);
+      return MOCK_USERS.filter(u => myTeam.memberIds.includes(u.id) || u.id === user?.id);
+    }
+    // member: only themselves
+    return MOCK_USERS.filter(u => u.id === user?.id);
+  }, [role, user?.id]);
+
+  // Members can only see person view; supervisors can switch; admins can switch
+  const canSeeTeam = role === 'admin' || role === 'director' || role === 'supervisor';
+  const canSeePerson = true;
+
+  const [mode, setMode] = useState<'team' | 'person'>(canSeeTeam ? 'person' : 'person');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(visibleTeams[0]?.id ?? '');
+  const [selectedUserId, setSelectedUserId] = useState<string>(
+    role === 'member' ? (user?.id ?? visibleUsers[0]?.id ?? '') : visibleUsers[0]?.id ?? ''
+  );
 
   const allAnalyses = useMemo(() => loadAllAiAnalyses(), []);
 
