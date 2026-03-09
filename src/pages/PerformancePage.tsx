@@ -210,46 +210,78 @@ export default function PerformancePage() {
         </div>
       </div>
 
+      {/* ── Role badge ── */}
+      {role === 'member' && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground">
+          <Lock className="w-3.5 h-3.5" />
+          Você está vendo apenas os seus próprios dados de desempenho.
+        </div>
+      )}
+      {role === 'supervisor' && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-primary">
+          <Users className="w-3.5 h-3.5" />
+          Você pode visualizar apenas os membros do seu time.
+        </div>
+      )}
+
       {/* ── Selector strip ── */}
       <div className="glass-card p-3 mb-5 flex items-center gap-3 flex-wrap">
-        {/* Mode toggle */}
-        <div className="flex gap-1 p-0.5 bg-secondary rounded-lg border border-border">
-          {(['person', 'team'] as const).map(m => (
-            <button key={m}
-              onClick={() => setMode(m)}
-              className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
-              {m === 'person' ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
-              {m === 'person' ? 'Vendedor' : 'Time'}
-            </button>
-          ))}
-        </div>
+        {/* Mode toggle — hidden for members (only person view) */}
+        {canSeeTeam && (
+          <div className="flex gap-1 p-0.5 bg-secondary rounded-lg border border-border">
+            {(['person', 'team'] as const).map(m => (
+              <button key={m}
+                onClick={() => setMode(m)}
+                className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                {m === 'person' ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
+                {m === 'person' ? 'Vendedor' : 'Time'}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Selector */}
+        {/* Selector — members see a static label, others get a dropdown */}
         {mode === 'person' ? (
-          <div className="relative">
-            <select
-              value={selectedUserId}
-              onChange={e => setSelectedUserId(e.target.value)}
-              className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
-              {MOCK_USERS.map(u => (
-                <option key={u.id} value={u.id}>{u.name} — {u.role === 'member' ? 'Vendedor' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'director' ? 'Diretor' : 'Admin'}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-3 h-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          role === 'member' ? (
+            <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-secondary border border-border text-xs text-foreground">
+              <User className="w-3.5 h-3.5 text-muted-foreground" />
+              {visibleUsers[0]?.name ?? 'Você'}
+            </div>
+          ) : (
+            <div className="relative">
+              <select
+                value={selectedUserId}
+                onChange={e => setSelectedUserId(e.target.value)}
+                className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
+                {visibleUsers.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} — {u.role === 'member' ? 'Vendedor' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'director' ? 'Diretor' : 'Admin'}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          )
         ) : (
-          <div className="relative">
-            <select
-              value={selectedTeamId}
-              onChange={e => setSelectedTeamId(e.target.value)}
-              className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
-              {MOCK_TEAMS.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-3 h-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          visibleTeams.length > 1 ? (
+            <div className="relative">
+              <select
+                value={selectedTeamId}
+                onChange={e => setSelectedTeamId(e.target.value)}
+                className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
+                {visibleTeams.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-secondary border border-border text-xs text-foreground">
+              <Users className="w-3.5 h-3.5 text-muted-foreground" />
+              {visibleTeams[0]?.name ?? 'Meu Time'}
+            </div>
+          )
         )}
       </div>
 
