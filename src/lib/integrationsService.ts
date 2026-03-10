@@ -14,7 +14,7 @@ async function resolveUserUuid(email: string): Promise<string | null> {
   return data?.id ?? null;
 }
 
-export type IntegrationType = 'google_calendar' | 'google_meet' | 'evolution_api';
+export type IntegrationType = 'evolution_api';
 
 export interface UserIntegration {
   tipo: IntegrationType;

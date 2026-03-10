@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import {
   Plus, Search, Mail, MoreHorizontal, Trash2, UserX, UserCheck,
   UserPlus, Eye, EyeOff, Shield, SlidersHorizontal, AlertTriangle,
-  Smartphone, Wifi, WifiOff, Loader2, Link2, Link2Off
+  Smartphone, Wifi, WifiOff, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -26,7 +26,6 @@ import {
   removeAllowedUser,
   type AllowedUser,
 } from '@/lib/accessControl';
-import { loadAllUserIntegrations } from '@/lib/integrationsService';
 
 const ROLE_CONFIG: Record<UserRole, { label: string; class: string }> = {
   admin:       { label: 'Admin',        class: 'bg-destructive/10 text-destructive border-destructive/20' },
@@ -373,22 +372,11 @@ export default function UsersPage() {
   const [confirmTarget, setConfirmTarget] = useState<{ user: User; action: 'deactivate' | 'activate' | 'delete' } | null>(null);
   const [roleTarget, setRoleTarget] = useState<User | null>(null);
   const [profileTarget, setProfileTarget] = useState<User | null>(null);
-  const [googleConnectedEmails, setGoogleConnectedEmails] = useState<Set<string>>(new Set());
-
   useEffect(() => {
     const run = async () => {
       try {
-        const [allowed, integrations] = await Promise.all([
-          loadAllowedUsers(),
-          loadAllUserIntegrations(),
-        ]);
+        const allowed = await loadAllowedUsers();
         setUsers(mapAllowedUsersToUsers(allowed));
-        const googleEmails = new Set(
-          integrations
-            .filter(i => i.tipo === 'google_calendar' && i.status === 'conectada')
-            .map(i => i.email.toLowerCase())
-        );
-        setGoogleConnectedEmails(googleEmails);
       } catch (e: any) {
         toast({ variant: 'destructive', title: 'Erro ao carregar usuários', description: e?.message || 'Tente novamente.' });
       }
@@ -492,7 +480,6 @@ export default function UsersPage() {
               <th className="text-left">Usuário</th>
               <th className="text-left hidden md:table-cell">Email</th>
               <th className="text-center hidden xl:table-cell">WhatsApp</th>
-              <th className="text-center hidden xl:table-cell">Google</th>
               <th className="text-center">Perfil</th>
               <th className="text-center">Status</th>
               <th className="text-center hidden lg:table-cell">Desde</th>
@@ -506,7 +493,6 @@ export default function UsersPage() {
               const instName = getInstanceForUserFromList(instances, u.id);
               const assignedInst = instances.find(i => i.name === instName);
               const isInstOpen = assignedInst?.connectionStatus === 'open';
-              const googleConnected = googleConnectedEmails.has(u.email.toLowerCase());
               return (
                 <tr key={u.id} className={cn(u.status === 'inactive' && 'opacity-60')}>
                   <td>
@@ -536,20 +522,6 @@ export default function UsersPage() {
                       </div>
                     ) : (
                       <span className="text-[10px] text-muted-foreground/40">—</span>
-                    )}
-                  </td>
-                  {/* Google column */}
-                  <td className="hidden xl:table-cell text-center">
-                    {googleConnected ? (
-                      <div className="flex items-center justify-center gap-1.5">
-                        <Link2 className="w-3.5 h-3.5 text-success" />
-                        <span className="text-[10px] text-success font-medium">Conectado</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center gap-1.5">
-                        <Link2Off className="w-3.5 h-3.5 text-muted-foreground/40" />
-                        <span className="text-[10px] text-muted-foreground/40">Desconectado</span>
-                      </div>
                     )}
                   </td>
                   <td className="text-center">

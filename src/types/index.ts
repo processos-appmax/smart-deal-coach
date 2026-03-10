@@ -168,7 +168,7 @@ export interface Conversation {
 
 export interface Integration {
   id: string;
-  type: 'google_calendar' | 'google_meet' | 'hubspot' | 'openai' | 'evolution_api' | 'n8n';
+  type: 'hubspot' | 'openai' | 'evolution_api' | 'n8n';
   name: string;
   status: 'connected' | 'disconnected' | 'error';
   configuredAt?: string;

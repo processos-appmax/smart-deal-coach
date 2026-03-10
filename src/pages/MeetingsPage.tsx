@@ -10,7 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { loadMeetingsFromDb, syncGoogleMeetTranscripts, type DbMeeting, type SyncResult } from '@/lib/googleSyncService';
+import { loadMeetingsFromDb, type DbMeeting } from '@/lib/meetingsService';
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   concluida: { label: 'Concluída', class: 'score-good' },
@@ -60,27 +60,12 @@ function ScoreBar({ value, label, icon, tip }: { value: number; label: string; i
   );
 }
 
-function getGoogleAccessToken(userId: string): string | null {
-  try {
-    const raw = localStorage.getItem(`google_session_${userId}`);
-    if (!raw) return null;
-    const session = JSON.parse(raw);
-    return session?.accessToken ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export default function MeetingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const userId = user?.id || '';
 
   const [meetings, setMeetings] = useState<DbMeeting[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState('');
-  const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedMeeting, setSelectedMeeting] = useState<DbMeeting | null>(null);
@@ -98,55 +83,6 @@ export default function MeetingsPage() {
   }, []);
 
   useEffect(() => { loadMeetings(); }, [loadMeetings]);
-
-  const handleSync = async () => {
-    const accessToken = getGoogleAccessToken(userId);
-    if (!accessToken) {
-      toast({
-        variant: 'destructive',
-        title: 'Google não conectado',
-        description: 'Conecte sua conta Google em Integrações antes de sincronizar.',
-      });
-      return;
-    }
-
-    if (!user?.email) return;
-
-    setSyncing(true);
-    setSyncProgress('Iniciando sincronização...');
-    setSyncResult(null);
-
-    try {
-      const result: SyncResult = await syncGoogleMeetTranscripts(
-        accessToken,
-        user.email,
-        30,
-        (msg) => setSyncProgress(msg),
-      );
-
-      if (result.errors.length > 0) {
-        setSyncResult({
-          type: 'error',
-          message: `Concluída com ${result.errors.length} erro(s). ${result.synced} importada(s), ${result.skipped} já existente(s). Erro: ${result.errors[0]}`,
-        });
-      } else {
-        setSyncResult({
-          type: 'success',
-          message: `Sincronização concluída — ${result.synced} nova(s) reunião(ões) importada(s), ${result.skipped} já existente(s), ${result.total} encontrada(s) no total.`,
-        });
-      }
-
-      await loadMeetings();
-    } catch (err: any) {
-      setSyncResult({
-        type: 'error',
-        message: `Erro na sincronização: ${err.message || 'Erro desconhecido'}`,
-      });
-    } finally {
-      setSyncing(false);
-      setSyncProgress('');
-    }
-  };
 
   const filtered = meetings.filter(m => {
     const s = search.toLowerCase();
@@ -172,40 +108,14 @@ export default function MeetingsPage() {
             </div>
             <Button
               size="sm"
-              onClick={handleSync}
-              disabled={syncing}
+              onClick={loadMeetings}
+              disabled={loading}
               className="text-xs h-8 bg-gradient-primary"
             >
-              {syncing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
-              {syncing ? 'Sincronizando...' : 'Sincronizar Google Meet'}
+              {loading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+              Atualizar
             </Button>
           </div>
-
-          {syncing && syncProgress && (
-            <div className="mb-4 p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-primary flex items-center gap-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-              {syncProgress}
-            </div>
-          )}
-
-          {!syncing && syncResult && (
-            <div className={cn(
-              'mb-4 p-3 rounded-lg text-xs flex items-center justify-between gap-2',
-              syncResult.type === 'success'
-                ? 'bg-success/10 border border-success/20 text-success'
-                : 'bg-destructive/10 border border-destructive/20 text-destructive'
-            )}>
-              <div className="flex items-center gap-2">
-                {syncResult.type === 'success'
-                  ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                  : <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />}
-                {syncResult.message}
-              </div>
-              <button onClick={() => setSyncResult(null)} className="flex-shrink-0 hover:opacity-70">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
 
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <div className="relative flex-1 min-w-48">

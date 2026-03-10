@@ -1,13 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { useGoogleLogin } from '@react-oauth/google';
-import { getStoredGoogleClientId } from '@/pages/AdminPage';
-
-const GOOGLE_CLIENT_ID = CONFIG.GOOGLE_CLIENT_ID;
 import {
   RefreshCw, Loader2, Smartphone, QrCode, MessageSquare,
   Phone, Wifi, WifiOff, X, CheckCircle2, XCircle,
-  Calendar, Video, HardDrive, LogOut, ShieldCheck,
   AlertTriangle, Activity, ArrowDown, ArrowUp, CheckCheck,
   ExternalLink, Database
 } from 'lucide-react';
@@ -18,74 +13,12 @@ import { assignInstanceToUser, getInstanceForUserFromList, type EvolutionInstanc
 import { loadAllowedUsers } from '@/lib/accessControl';
 import { supabase } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
-import { upsertUserIntegration, deleteUserIntegrations } from '@/lib/integrationsService';
 
 import { CONFIG } from '@/lib/config';
 
 // ─── Evolution API config ─────────────────────────────────────────────────────
 const EVOLUTION_API_URL = CONFIG.EVOLUTION_API_URL;
 const EVOLUTION_API_TOKEN = CONFIG.EVOLUTION_API_TOKEN;
-const ALLOWED_DOMAIN = CONFIG.GOOGLE_ALLOWED_DOMAIN;
-
-// ─── Google services config ───────────────────────────────────────────────────
-const GOOGLE_SERVICES = [
-  {
-    id: 'calendar',
-    label: 'Google Calendar',
-    icon: Calendar,
-    color: 'hsl(210 100% 56%)',
-    desc: 'Sincroniza reuniões e agenda automaticamente',
-    scope: 'https://www.googleapis.com/auth/calendar.readonly',
-  },
-  {
-    id: 'meet',
-    label: 'Google Meet',
-    icon: Video,
-    color: 'hsl(168 80% 42%)',
-    desc: 'Captura dados e transcrições de chamadas',
-    scope: 'https://www.googleapis.com/auth/meetings.space.readonly',
-  },
-  {
-    id: 'drive',
-    label: 'Google Drive',
-    icon: HardDrive,
-    color: 'hsl(38 92% 50%)',
-    desc: 'Acessa transcrições e arquivos gerados pelo Meet',
-    scope: 'https://www.googleapis.com/auth/drive.readonly',
-  },
-] as const;
-
-type GoogleServiceId = 'calendar' | 'meet' | 'drive';
-
-interface GoogleSession {
-  email: string;
-  name: string;
-  picture?: string;
-  connectedAt: string;
-  services: GoogleServiceId[];
-  accessToken?: string;
-}
-
-// localStorage helpers for Google session
-const GOOGLE_SESSION_KEY = (userId: string) => `google_session_${userId}`;
-
-function getGoogleSession(userId: string): GoogleSession | null {
-  try {
-    const raw = localStorage.getItem(GOOGLE_SESSION_KEY(userId));
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function saveGoogleSession(userId: string, session: GoogleSession) {
-  localStorage.setItem(GOOGLE_SESSION_KEY(userId), JSON.stringify(session));
-  // also mark the simpler flag used by UsersPage
-  localStorage.setItem(`google_connected_${userId}`, 'true');
-}
-
-function clearGoogleSession(userId: string) {
-  localStorage.removeItem(GOOGLE_SESSION_KEY(userId));
-  localStorage.removeItem(`google_connected_${userId}`);
-}
 
 // ─── Evolution API helpers ────────────────────────────────────────────────────
 interface EvolutionInstance {
@@ -128,294 +61,6 @@ function StatusBadge({ status }: { status: string }) {
       {isOpen ? <Wifi className="w-2.5 h-2.5" /> : isConnecting ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <WifiOff className="w-2.5 h-2.5" />}
       {isOpen ? 'Conectado' : isConnecting ? 'Conectando...' : 'Desconectado'}
     </span>
-  );
-}
-
-// ─── Google Integration Panel ─────────────────────────────────────────────────
-function GooglePanel() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const userId = user?.id || '';
-
-  const [session, setSession] = useState<GoogleSession | null>(() => getGoogleSession(userId));
-  const [connecting, setConnecting] = useState(false);
-
-  const hasClientId = !!(GOOGLE_CLIENT_ID || getStoredGoogleClientId());
-
-  const googleLogin = useGoogleLogin({
-    scope: [
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/drive.readonly',
-      'openid email profile',
-    ].join(' '),
-    // Restrict to appmax.com.br domain
-    hosted_domain: 'appmax.com.br',
-    onSuccess: async (tokenResponse) => {
-      try {
-        // Fetch user info from Google
-        const infoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const info = await infoRes.json();
-
-        // Enforce domain restriction server-side (even though hd= hint is set)
-        if (!info.email?.endsWith('@appmax.com.br')) {
-          toast({
-            variant: 'destructive',
-            title: 'Domínio não autorizado',
-            description: 'Apenas contas @appmax.com.br podem conectar ao Google.',
-          });
-          setConnecting(false);
-          return;
-        }
-
-        const newSession: GoogleSession = {
-          email: info.email,
-          name: info.name || info.email,
-          picture: info.picture,
-          connectedAt: new Date().toISOString(),
-          services: ['calendar', 'meet', 'drive'],
-          accessToken: tokenResponse.access_token,
-        };
-
-        saveGoogleSession(userId, newSession);
-        setSession(newSession);
-
-        // Persist to DB
-        if (user?.email) {
-          upsertUserIntegration(user.email, 'google_calendar', info.name || info.email, 'conectada').catch(() => {});
-          upsertUserIntegration(user.email, 'google_meet', info.name || info.email, 'conectada').catch(() => {});
-        }
-
-        toast({
-          title: 'Google conectado com sucesso!',
-          description: `${info.name} — Calendar, Meet e Drive sincronizados.`,
-        });
-      } catch {
-        toast({ variant: 'destructive', title: 'Erro ao obter informações do Google.' });
-      } finally {
-        setConnecting(false);
-      }
-    },
-    onError: (err) => {
-      console.error(err);
-      toast({ variant: 'destructive', title: 'Autenticação cancelada ou erro no Google.' });
-      setConnecting(false);
-    },
-    onNonOAuthError: () => {
-      toast({ variant: 'destructive', title: 'Popup bloqueado pelo navegador. Permita popups e tente novamente.' });
-      setConnecting(false);
-    },
-  });
-
-  const handleConnect = () => {
-    if (!hasClientId) {
-      toast({
-        variant: 'destructive',
-        title: 'Client ID não configurado',
-        description: 'Adicione VITE_GOOGLE_CLIENT_ID nas variáveis de ambiente do projeto.',
-      });
-      return;
-    }
-    setConnecting(true);
-    googleLogin();
-  };
-
-  const handleDisconnect = async () => {
-    // Revoke the Google token if we have it
-    if (session?.accessToken) {
-      fetch(`https://oauth2.googleapis.com/revoke?token=${session.accessToken}`, {
-        method: 'POST',
-      }).catch(() => {});
-    }
-
-    clearGoogleSession(userId);
-    setSession(null);
-
-    // Delete integration records from DB (not just mark as desconectada)
-    if (user?.email) {
-      deleteUserIntegrations(user.email, ['google_calendar', 'google_meet']).catch(() => {});
-    }
-
-    toast({ title: 'Google desconectado', description: 'Sua conta Google foi removida e dados de integração excluídos.' });
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* Missing Client ID warning */}
-      {!hasClientId && (
-        <div className="p-4 rounded-xl border border-warning/30 bg-warning/5 flex items-start gap-3">
-          <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs font-semibold text-warning mb-1">Client ID do Google não configurado</p>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Para ativar o OAuth real, vá em <strong>Admin → Integrações OAuth</strong> e cadastre o Client ID do Google Cloud Console.
-            </p>
-            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-1.5">
-              Abrir Google Cloud Console <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* Header card */}
-      <div className="glass-card p-5" style={{ background: 'linear-gradient(135deg, hsl(210 100% 56% / 0.06), hsl(168 80% 42% / 0.04))' }}>
-        <div className="flex items-start justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            {/* Google logo */}
-            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center border border-border flex-shrink-0">
-              <svg className="w-7 h-7" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-            </div>
-            <div>
-              <p className="font-display font-semibold text-sm">Google Workspace</p>
-              <p className="text-xs text-muted-foreground">
-                Uma única autenticação conecta Calendar, Meet e Drive
-              </p>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <ShieldCheck className="w-3 h-3 text-primary" />
-                <span className="text-[11px] text-muted-foreground">Restrito a <strong>@{ALLOWED_DOMAIN}</strong></span>
-              </div>
-            </div>
-          </div>
-
-          {session ? (
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-success/10 border border-success/20 text-success font-medium">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Conectado
-              </span>
-              <Button size="sm" variant="outline" className="text-xs h-8 border-border text-destructive hover:text-destructive hover:border-destructive/30" onClick={handleDisconnect}>
-                <LogOut className="w-3 h-3 mr-1.5" /> Desconectar
-              </Button>
-            </div>
-          ) : (
-            <Button
-              size="sm"
-              className="bg-white text-gray-800 border border-border hover:bg-gray-100 text-xs h-9 font-medium shadow-sm"
-              onClick={handleConnect}
-              disabled={connecting}
-            >
-              {connecting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-              )}
-              {connecting ? 'Autenticando...' : 'Entrar com Google'}
-            </Button>
-          )}
-        </div>
-
-        {/* Account info when connected */}
-        {session && (
-          <div className="mt-4 pt-4 border-t border-border flex items-center gap-3">
-            {session.picture ? (
-              <img src={session.picture} alt={session.name} className="w-8 h-8 rounded-full border border-border" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                {session.name.charAt(0)}
-              </div>
-            )}
-            <div>
-              <p className="text-xs font-semibold">{session.name}</p>
-              <p className="text-[11px] text-muted-foreground">{session.email}</p>
-            </div>
-            <span className="ml-auto text-[10px] text-muted-foreground">
-              Conectado em {new Date(session.connectedAt).toLocaleDateString('pt-BR')}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Services grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {GOOGLE_SERVICES.map(svc => {
-          const Icon = svc.icon;
-          const isActive = session?.services.includes(svc.id) ?? false;
-          return (
-            <div key={svc.id} className={cn(
-              'glass-card p-4 transition-all',
-              isActive ? 'border-border' : 'opacity-50'
-            )}>
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${svc.color}20` }}>
-                  <Icon className="w-4.5 h-4.5" style={{ color: svc.color, width: 18, height: 18 }} />
-                </div>
-                {isActive ? (
-                  <CheckCircle2 className="w-4 h-4 text-success" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-muted-foreground/40" />
-                )}
-              </div>
-              <p className="text-xs font-semibold mb-1">{svc.label}</p>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">{svc.desc}</p>
-              {isActive && (
-                <div className="mt-3 pt-3 border-t border-border/50">
-                  <span className="text-[10px] text-success font-medium flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                    Sincronizando
-                  </span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* How it works */}
-      {!session && (
-        <div className="glass-card p-4 border-primary/20 bg-primary/5">
-          <p className="text-xs font-semibold mb-3 flex items-center gap-2">
-            <Activity className="w-3.5 h-3.5 text-primary" />
-            Como funciona
-          </p>
-          <ol className="space-y-2">
-            {[
-              'Clique em "Entrar com Google" — use sua conta @appmax.com.br',
-              'Autorize o acesso ao Calendar, Meet e Drive de uma só vez',
-              'O sistema sincroniza reuniões e puxa transcrições automaticamente',
-              'A IA analisa as transcrições e popula os scorecards de Reuniões',
-            ].map((step, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-[11px] text-muted-foreground">
-                <span className="w-4 h-4 rounded-full bg-primary/15 text-primary text-[9px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
-                {step}
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
-
-      {/* Transcriptions info when connected */}
-      {session && (
-        <div className="glass-card p-4 border-success/20 bg-success/5">
-          <p className="text-xs font-semibold mb-2 flex items-center gap-2 text-success">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Transcrições habilitadas
-          </p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            O sistema buscará automaticamente transcrições de reuniões salvas no Google Drive.
-            Elas serão enviadas ao modelo de IA configurado no módulo de Reuniões para análise e geração de scorecards.
-          </p>
-          <a
-            href="https://support.google.com/meet/answer/10167275"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-2"
-          >
-            Como ativar transcrições no Google Meet <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -980,8 +625,6 @@ function DatabasePanel() {
   const tipoIcon: Record<string, string> = {
     evolution_api: '📱',
     openai: '🤖',
-    google_calendar: '📅',
-    google_meet: '🎥',
     hubspot: '🔗',
     n8n: '⚡',
   };
@@ -1108,27 +751,19 @@ function DatabasePanel() {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function IntegrationsPage() {
-  const [tab, setTab] = useState<'google' | 'whatsapp' | 'database' | 'logs'>('google');
+  const [tab, setTab] = useState<'whatsapp' | 'database' | 'logs'>('whatsapp');
 
   return (
     <div className="page-container animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-display font-bold">Integrações</h1>
-          <p className="text-sm text-muted-foreground">Conecte sua conta Google e gerencie o WhatsApp</p>
+          <p className="text-sm text-muted-foreground">Gerencie suas integrações WhatsApp, tokens e logs</p>
         </div>
       </div>
 
       <div className="flex gap-1 p-1 bg-secondary rounded-lg border border-border mb-6 w-fit">
         {[
-          { key: 'google',   label: 'Google',    icon: () => (
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-          )},
           { key: 'whatsapp', label: 'WhatsApp',  icon: MessageSquare },
           { key: 'database', label: 'Banco / Tokens', icon: Database },
           { key: 'logs',     label: 'Logs',      icon: Activity },
@@ -1145,7 +780,6 @@ export default function IntegrationsPage() {
         })}
       </div>
 
-      {tab === 'google'   && <GooglePanel />}
       {tab === 'whatsapp' && <EvolutionPanel />}
       {tab === 'database' && <DatabasePanel />}
       {tab === 'logs'     && <WebhookLogs />}
