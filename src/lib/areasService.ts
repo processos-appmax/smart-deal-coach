@@ -48,7 +48,7 @@ export async function loadAreas(): Promise<AreaRecord[]> {
 }
 
 /** Create a new area */
-export async function createArea(nome: string, gerenteEmail?: string): Promise<void> {
+export async function createArea(nome: string, gerenteEmail?: string, memberEmails?: string[]): Promise<void> {
   const empresaId = await getSaasEmpresaId();
   let gerenteId: string | null = null;
 
@@ -63,20 +63,26 @@ export async function createArea(nome: string, gerenteEmail?: string): Promise<v
     gerenteId = data?.id ?? null;
   }
 
-  const { error } = await (supabase as any)
+  const { data: row, error } = await (supabase as any)
     .schema('saas')
     .from('areas')
     .insert({
       empresa_id: empresaId,
       nome: nome.trim(),
       gerente_id: gerenteId,
-    });
+    })
+    .select('id')
+    .single();
 
   if (error) throw error;
+
+  if (memberEmails && memberEmails.length > 0 && row?.id) {
+    await assignAreaMembers(row.id, memberEmails);
+  }
 }
 
 /** Update an area */
-export async function updateArea(areaId: string, nome: string, gerenteEmail?: string): Promise<void> {
+export async function updateArea(areaId: string, nome: string, gerenteEmail?: string, memberEmails?: string[]): Promise<void> {
   const empresaId = await getSaasEmpresaId();
   let gerenteId: string | null = null;
 
@@ -102,6 +108,10 @@ export async function updateArea(areaId: string, nome: string, gerenteEmail?: st
     .eq('id', areaId);
 
   if (error) throw error;
+
+  if (memberEmails !== undefined) {
+    await assignAreaMembers(areaId, memberEmails);
+  }
 }
 
 /** Delete an area */
@@ -140,4 +150,40 @@ export async function countUsersInArea(areaId: string): Promise<number> {
     .eq('area_id', areaId);
 
   return data?.length || 0;
+}
+
+/** Load members directly assigned to an area */
+export async function loadAreaMembers(areaId: string): Promise<{ id: string; nome: string; email: string; papel: string }[]> {
+  const empresaId = await getSaasEmpresaId();
+  const { data } = await (supabase as any)
+    .schema('saas')
+    .from('usuarios')
+    .select('id, nome, email, papel')
+    .eq('empresa_id', empresaId)
+    .eq('area_id', areaId);
+
+  return data || [];
+}
+
+/** Assign members to an area (set area_id on usuarios) */
+export async function assignAreaMembers(areaId: string, memberEmails: string[]): Promise<void> {
+  const empresaId = await getSaasEmpresaId();
+
+  // Remove current direct members from this area (only those NOT in a team of this area)
+  await (supabase as any)
+    .schema('saas')
+    .from('usuarios')
+    .update({ area_id: null })
+    .eq('empresa_id', empresaId)
+    .eq('area_id', areaId);
+
+  // Assign new members
+  for (const email of memberEmails) {
+    await (supabase as any)
+      .schema('saas')
+      .from('usuarios')
+      .update({ area_id: areaId })
+      .eq('empresa_id', empresaId)
+      .eq('email', email.trim().toLowerCase());
+  }
 }

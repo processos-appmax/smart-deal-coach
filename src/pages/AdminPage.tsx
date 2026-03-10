@@ -11,7 +11,7 @@ import {
   Lock, ToggleLeft, ToggleRight, SlidersHorizontal,
   Layers, Plus, Trash2, ChevronDown, ChevronUp, GitBranch,
   ScrollText, LogIn, LogOut, MonitorSmartphone, Search, RefreshCw, Trash,
-  Filter, Plug, Copy, ExternalLink,
+  Filter, Plug, Copy, ExternalLink, Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppConfig, DEFAULT_MODULES, type ModuleId, AI_MODELS, type ModuleAIKey } from '@/contexts/AppConfigContext';
@@ -39,6 +39,8 @@ import {
   createArea,
   updateArea,
   deleteArea,
+  loadAreaMembers,
+  assignAreaMembers,
   type AreaRecord,
 } from '@/lib/areasService';
 
@@ -131,6 +133,8 @@ export default function AdminPage() {
   const [editingArea, setEditingArea] = useState<AreaRecord | null>(null);
   const [areaName, setAreaName] = useState('');
   const [areaGerente, setAreaGerente] = useState('');
+  const [areaMemberEmails, setAreaMemberEmails] = useState<string[]>([]);
+  const [areaMembersMap, setAreaMembersMap] = useState<Record<string, { nome: string; email: string; papel: string }[]>>({});
 
   const { tokens, setToken, models, setModuleModel, modules, setModuleEnabled, saveConfig,
           getUserDisabledModules, setUserModuleOverride } = useAppConfig();
@@ -158,7 +162,14 @@ export default function AdminPage() {
       loadAccessData();
     }
     if (section === 'roles') {
-      loadAreas().then(setDbAreas).catch(() => {});
+      loadAreas().then(async (areas) => {
+        setDbAreas(areas);
+        const membersMap: Record<string, { nome: string; email: string; papel: string }[]> = {};
+        for (const a of areas) {
+          membersMap[a.id] = await loadAreaMembers(a.id);
+        }
+        setAreaMembersMap(membersMap);
+      }).catch(() => {});
       loadAllowedUsers().then(setAllowedAccounts).catch(() => {});
     }
   }, [section, getLogs, toast]);
@@ -173,17 +184,25 @@ export default function AdminPage() {
     }
     try {
       if (editingArea) {
-        await updateArea(editingArea.id, areaName, areaGerente || undefined);
+        await updateArea(editingArea.id, areaName, areaGerente || undefined, areaMemberEmails);
         toast({ title: 'Área atualizada' });
       } else {
-        await createArea(areaName, areaGerente || undefined);
+        await createArea(areaName, areaGerente || undefined, areaMemberEmails);
         toast({ title: 'Área criada', description: `"${areaName}" criada com sucesso.` });
       }
       setShowAreaForm(false);
       setEditingArea(null);
       setAreaName('');
       setAreaGerente('');
-      loadAreas().then(setDbAreas).catch(() => {});
+      setAreaMemberEmails([]);
+      loadAreas().then(async (areas) => {
+        setDbAreas(areas);
+        const membersMap: Record<string, { nome: string; email: string; papel: string }[]> = {};
+        for (const a of areas) {
+          membersMap[a.id] = await loadAreaMembers(a.id);
+        }
+        setAreaMembersMap(membersMap);
+      }).catch(() => {});
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Erro', description: e?.message || 'Falha ao salvar área.' });
     }
@@ -200,10 +219,12 @@ export default function AdminPage() {
     }
   };
 
-  const openEditArea = (area: AreaRecord) => {
+  const openEditArea = async (area: AreaRecord) => {
     setEditingArea(area);
     setAreaName(area.nome);
     setAreaGerente(area.gerente_email || '');
+    const members = await loadAreaMembers(area.id);
+    setAreaMemberEmails(members.map(m => m.email));
     setShowAreaForm(true);
   };
 
@@ -211,6 +232,7 @@ export default function AdminPage() {
     setEditingArea(null);
     setAreaName('');
     setAreaGerente('');
+    setAreaMemberEmails([]);
     setShowAreaForm(true);
   };
 
@@ -545,6 +567,37 @@ export default function AdminPage() {
                         </select>
                       </div>
                     </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-1">
+                        Participantes da área — {areaMemberEmails.length} selecionado(s)
+                      </label>
+                      <div className="space-y-1 max-h-40 overflow-y-auto pr-1 border border-border/50 rounded-lg p-2 bg-secondary/50">
+                        {allowedAccounts.map(u => {
+                          const selected = areaMemberEmails.includes(u.email);
+                          return (
+                            <div
+                              key={u.email}
+                              onClick={() => setAreaMemberEmails(prev =>
+                                prev.includes(u.email) ? prev.filter(e => e !== u.email) : [...prev, u.email]
+                              )}
+                              className={cn(
+                                'flex items-center gap-2 p-1.5 rounded-md cursor-pointer transition-all text-xs',
+                                selected ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted/50 border border-transparent'
+                              )}
+                            >
+                              <div className={cn(
+                                'w-3.5 h-3.5 rounded-full border flex items-center justify-center flex-shrink-0',
+                                selected ? 'bg-primary border-primary' : 'border-border'
+                              )}>
+                                {selected && <Check className="w-2 h-2 text-primary-foreground" />}
+                              </div>
+                              <span className="font-medium">{u.name}</span>
+                              <span className="text-muted-foreground">({u.email})</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <Button size="sm" className="text-xs h-7 bg-gradient-primary" onClick={handleSaveArea}>
                         <Save className="w-3 h-3 mr-1" /> {editingArea ? 'Salvar' : 'Criar Área'}
@@ -586,6 +639,18 @@ export default function AdminPage() {
                           </Button>
                         </div>
                       </div>
+                      {(areaMembersMap[area.id] || []).length > 0 && (
+                        <div className="pt-1">
+                          <p className="text-[10px] text-muted-foreground mb-1">Participantes ({areaMembersMap[area.id].length}):</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {areaMembersMap[area.id].map(m => (
+                              <span key={m.email} className="text-[10px] px-2 py-0.5 rounded-full bg-muted border border-border">
+                                {m.nome}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
