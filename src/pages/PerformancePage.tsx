@@ -1,26 +1,11 @@
-import { useState, useMemo } from 'react';
-import { TrendingUp, Users, User, MessageSquare, Video, Brain, ChevronDown, Award, BarChart3, Calendar, Lock } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { TrendingUp, Users, User, MessageSquare, Video, Brain, ChevronDown, Award, BarChart3, Calendar, Lock, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MOCK_USERS, MOCK_TEAMS, MOCK_MEETINGS, MOCK_EVALUATIONS } from '@/data/mockData';
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend } from 'recharts';
-import { AI_CONFIG_STORAGE, DEFAULT_WHATSAPP_CRITERIA } from '@/pages/AIConfigPage';
 import { useAuth } from '@/contexts/AuthContext';
+import { loadEvaluations, loadUsersForPerformance, loadTeamsForPerformance, type StoredEvaluation } from '@/lib/evaluationService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function loadAllAiAnalyses(): { chatId: string; result: any }[] {
-  const out: { chatId: string; result: any }[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith('appmax_ai_analysis_')) {
-      try {
-        const r = JSON.parse(localStorage.getItem(key)!);
-        out.push({ chatId: key.replace('appmax_ai_analysis_', ''), result: r });
-      } catch { /* ignore */ }
-    }
-  }
-  return out;
-}
-
 function scoreColor(s: number) {
   if (s >= 85) return 'text-success';
   if (s >= 70) return 'text-primary';
@@ -39,6 +24,11 @@ function scoreLabel(s: number) {
   if (s >= 50) return 'Regular';
   return 'Crítico';
 }
+
+const roleMap: Record<string, string> = {
+  admin: 'admin', ceo: 'ceo', diretor: 'director', gerente: 'manager',
+  coordenador: 'coordinator', supervisor: 'supervisor', vendedor: 'member',
+};
 
 // ─── Score Card ───────────────────────────────────────────────────────────────
 function ScoreCard({ label, value, icon: Icon, sub }: { label: string; value: number | string; icon: any; sub?: string }) {
@@ -80,130 +70,182 @@ export default function PerformancePage() {
   const { user, hasMinRole } = useAuth();
   const role = user?.role ?? 'member';
 
-  // ── Determine visible scope based on role hierarchy ────────────────────────
-  // admin/ceo/director → all  |  manager → their area  |  coordinator → their area teams
-  // supervisor → their team   |  member → only self
+  // ── Load data from DB ─────────────────────────────────────────────────────
+  const [loading, setLoading] = useState(true);
+  const [dbUsers, setDbUsers] = useState<any[]>([]);
+  const [dbTeams, setDbTeams] = useState<any[]>([]);
+  const [evaluations, setEvaluations] = useState<StoredEvaluation[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [users, teams, evals] = await Promise.all([
+        loadUsersForPerformance(),
+        loadTeamsForPerformance(),
+        loadEvaluations(),
+      ]);
+      setDbUsers(users);
+      setDbTeams(teams);
+      setEvaluations(evals);
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  // ── Map DB users to consistent format ─────────────────────────────────────
+  const users = useMemo(() => dbUsers.map(u => ({
+    id: u.id,
+    name: u.nome,
+    email: u.email,
+    avatar: u.avatar_url,
+    role: roleMap[u.papel] || 'member',
+    areaId: u.area_id,
+    teamId: u.time_id,
+  })), [dbUsers]);
+
+  const teams = useMemo(() => dbTeams.map(t => ({
+    id: t.id,
+    name: t.nome,
+    areaId: t.area_id,
+    supervisorId: t.supervisor_id,
+  })), [dbTeams]);
+
+  // ── Role-based visibility ─────────────────────────────────────────────────
   const visibleTeams = useMemo(() => {
-    if (hasMinRole('director')) return MOCK_TEAMS;
-    if (role === 'manager')
-      return MOCK_TEAMS.filter(t => t.areaId === user?.areaId);
-    if (role === 'coordinator')
-      return MOCK_TEAMS.filter(t => t.areaId === user?.areaId);
+    if (hasMinRole('director')) return teams;
+    if (role === 'manager' || role === 'coordinator')
+      return teams.filter(t => t.areaId === user?.areaId);
     if (role === 'supervisor')
-      return MOCK_TEAMS.filter(t => t.supervisorId === user?.id);
+      return teams.filter(t => t.supervisorId === user?.id);
     return [];
-  }, [role, user?.id, user?.areaId, hasMinRole]);
+  }, [role, user?.id, user?.areaId, hasMinRole, teams]);
 
   const visibleUsers = useMemo(() => {
-    if (hasMinRole('director')) return MOCK_USERS;
+    if (hasMinRole('director')) return users;
     if (role === 'manager' || role === 'coordinator')
-      return MOCK_USERS.filter(u => u.areaId === user?.areaId);
+      return users.filter(u => u.areaId === user?.areaId);
     if (role === 'supervisor') {
-      const myTeam = MOCK_TEAMS.find(t => t.supervisorId === user?.id);
-      if (!myTeam) return MOCK_USERS.filter(u => u.id === user?.id);
-      return MOCK_USERS.filter(u => myTeam.memberIds.includes(u.id) || u.id === user?.id);
+      const myTeam = teams.find(t => t.supervisorId === user?.id);
+      if (!myTeam) return users.filter(u => u.id === user?.id);
+      return users.filter(u => u.teamId === myTeam.id || u.id === user?.id);
     }
-    return MOCK_USERS.filter(u => u.id === user?.id);
-  }, [role, user?.id, user?.areaId, hasMinRole]);
+    return users.filter(u => u.id === user?.id);
+  }, [role, user?.id, user?.areaId, hasMinRole, users, teams]);
 
   const canSeeTeam = hasMinRole('supervisor');
 
   const [mode, setMode] = useState<'team' | 'person'>('person');
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(visibleTeams[0]?.id ?? '');
-  const [selectedUserId, setSelectedUserId] = useState<string>(
-    role === 'member' ? (user?.id ?? visibleUsers[0]?.id ?? '') : visibleUsers[0]?.id ?? ''
-  );
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
 
-  const allAnalyses = useMemo(() => loadAllAiAnalyses(), []);
+  // Auto-select first user/team when data loads
+  useEffect(() => {
+    if (visibleUsers.length > 0 && !selectedUserId) {
+      setSelectedUserId(role === 'member' ? (user?.id ?? visibleUsers[0].id) : visibleUsers[0].id);
+    }
+  }, [visibleUsers, selectedUserId]);
+  useEffect(() => {
+    if (visibleTeams.length > 0 && !selectedTeamId) {
+      setSelectedTeamId(visibleTeams[0].id);
+    }
+  }, [visibleTeams, selectedTeamId]);
 
-  // ── Build user performance data ────────────────────────────────────────────
+  // ── Build user performance from evaluations ───────────────────────────────
   const buildUserPerf = (userId: string) => {
-    const u = MOCK_USERS.find(x => x.id === userId);
+    const u = users.find(x => x.id === userId);
     if (!u) return null;
 
-    // Meetings
-    const userMeetings = MOCK_MEETINGS.filter(m => m.sellerId === userId && m.status === 'completed');
-    const evaluatedMeetings = userMeetings.filter(m => m.score != null);
-    const avgMeetingScore = evaluatedMeetings.length
-      ? Math.round(evaluatedMeetings.reduce((a, m) => a + (m.score ?? 0), 0) / evaluatedMeetings.length)
+    const userEvals = evaluations.filter(e => e.vendedor_id === userId);
+    const meetEvals = userEvals.filter(e => e.tipo_contexto === 'reuniao');
+    const waEvals = userEvals.filter(e => e.tipo_contexto === 'whatsapp');
+
+    const avgMeetingScore = meetEvals.length
+      ? Math.round(meetEvals.reduce((a, e) => a + (e.score || 0), 0) / meetEvals.length)
+      : null;
+    const avgWaScore = waEvals.length
+      ? Math.round(waEvals.reduce((a, e) => a + (e.score || 0), 0) / waEvals.length)
       : null;
 
-    // Detailed eval criteria (from MOCK_EVALUATIONS)
-    const evals = MOCK_EVALUATIONS.filter(e => userMeetings.some(m => m.id === e.meetingId));
-    const avgCriteria = evals.length ? {
-      rapport:      Math.round(evals.reduce((a, e) => a + e.rapport, 0) / evals.length),
-      discovery:    Math.round(evals.reduce((a, e) => a + e.discovery, 0) / evals.length),
-      presentation: Math.round(evals.reduce((a, e) => a + e.presentation, 0) / evals.length),
-      objections:   Math.round(evals.reduce((a, e) => a + e.objections, 0) / evals.length),
-      nextSteps:    Math.round(evals.reduce((a, e) => a + e.nextSteps, 0) / evals.length),
-    } : null;
-
-    // WhatsApp AI analyses (all cached in localStorage, filter by instance assigned to user)
-    // Since we don't have instanceId in analysis, we use all analyses as a demo (or could be scoped)
-    const waAnalyses = allAnalyses.filter(a => a.result?.totalScore != null);
-    const avgWaScore = waAnalyses.length
-      ? Math.round(waAnalyses.reduce((a, x) => a + x.result.totalScore, 0) / waAnalyses.length)
-      : null;
-
-    // WA criteria breakdown (average across analyses)
-    const waCriteria = waAnalyses.length
-      ? (() => {
-          const criMap: Record<string, number[]> = {};
-          waAnalyses.forEach(a => {
-            (a.result.criteriaScores ?? []).forEach((c: any) => {
-              if (!criMap[c.label]) criMap[c.label] = [];
-              criMap[c.label].push(c.score);
-            });
-          });
-          return Object.entries(criMap).map(([label, scores]) => ({
-            label,
-            score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
-          }));
-        })()
-      : null;
-
-    // Combined overall score
     const parts = [avgMeetingScore, avgWaScore].filter(Boolean) as number[];
     const overallScore = parts.length ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : null;
 
-    // Score trend (per meeting)
-    const trend = evaluatedMeetings
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .map(m => ({ date: new Date(m.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), score: m.score ?? 0, title: m.title }));
+    // Criteria averages for meetings
+    const meetCriteriaMap: Record<string, { total: number; count: number; weight: number }> = {};
+    for (const e of meetEvals) {
+      for (const c of (e.criterios || []) as any[]) {
+        if (!meetCriteriaMap[c.label]) meetCriteriaMap[c.label] = { total: 0, count: 0, weight: c.weight || 0 };
+        meetCriteriaMap[c.label].total += c.score;
+        meetCriteriaMap[c.label].count++;
+      }
+    }
+    const meetCriteria = Object.entries(meetCriteriaMap).map(([label, v]) => ({
+      label,
+      score: Math.round(v.total / v.count),
+      weight: v.weight,
+    }));
 
-    // Radar data
-    const radarData = avgCriteria ? [
-      { subject: 'Rapport',     A: avgCriteria.rapport },
-      { subject: 'Descoberta',  A: avgCriteria.discovery },
-      { subject: 'Apresentação',A: avgCriteria.presentation },
-      { subject: 'Objeções',    A: avgCriteria.objections },
-      { subject: 'Prox. Passos',A: avgCriteria.nextSteps },
-    ] : null;
+    // Criteria averages for WhatsApp
+    const waCriteriaMap: Record<string, { total: number; count: number; weight: number }> = {};
+    for (const e of waEvals) {
+      for (const c of (e.criterios || []) as any[]) {
+        if (!waCriteriaMap[c.label]) waCriteriaMap[c.label] = { total: 0, count: 0, weight: c.weight || 0 };
+        waCriteriaMap[c.label].total += c.score;
+        waCriteriaMap[c.label].count++;
+      }
+    }
+    const waCriteria = Object.entries(waCriteriaMap).map(([label, v]) => ({
+      label,
+      score: Math.round(v.total / v.count),
+      weight: v.weight,
+    }));
 
-    return { u, avgMeetingScore, avgWaScore, overallScore, avgCriteria, waCriteria, trend, radarData, evaluatedMeetings, evals, waAnalyses };
+    // Radar data from meeting criteria
+    const radarData = meetCriteria.length ? meetCriteria.map(c => ({ subject: c.label, A: c.score })) : null;
+
+    // Score trend for meetings (by date)
+    const trend = meetEvals
+      .filter(e => e.criado_em)
+      .sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime())
+      .map(e => ({
+        date: new Date(e.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        score: e.score || 0,
+      }));
+
+    return { u, avgMeetingScore, avgWaScore, overallScore, meetCriteria, waCriteria, trend, radarData, meetEvals, waEvals };
   };
 
-  // ── Team mode ─────────────────────────────────────────────────────────────
+  // ── Team performance ──────────────────────────────────────────────────────
   const buildTeamPerf = (teamId: string) => {
-    const team = MOCK_TEAMS.find(t => t.id === teamId);
+    const team = teams.find(t => t.id === teamId);
     if (!team) return null;
-    const teamUserIds = [...team.memberIds, team.supervisorId];
-    const members = teamUserIds.map(id => buildUserPerf(id)).filter(Boolean) as NonNullable<ReturnType<typeof buildUserPerf>>[];
-    const avgOverall = members.filter(m => m.overallScore).length
-      ? Math.round(members.filter(m => m.overallScore != null).reduce((a, m) => a + (m.overallScore ?? 0), 0) / members.filter(m => m.overallScore != null).length)
+
+    const teamMembers = users.filter(u => u.teamId === teamId);
+    const members = teamMembers.map(u => buildUserPerf(u.id)).filter(Boolean) as NonNullable<ReturnType<typeof buildUserPerf>>[];
+
+    const withScore = members.filter(m => m.overallScore !== null);
+    const avgOverall = withScore.length
+      ? Math.round(withScore.reduce((a, m) => a + (m.overallScore ?? 0), 0) / withScore.length)
       : null;
-    const totalMeetings = members.reduce((a, m) => a + m.evaluatedMeetings.length, 0);
-    const totalWaAnalyses = members.reduce((a, m) => a + m.waAnalyses.length, 0);
+    const totalMeetings = members.reduce((a, m) => a + m.meetEvals.length, 0);
+    const totalWaAnalyses = members.reduce((a, m) => a + m.waEvals.length, 0);
+
     return { team, members, avgOverall, totalMeetings, totalWaAnalyses };
   };
 
-  // For members, always show their own profile regardless of selection
   const effectiveUserId = role === 'member' ? (user?.id ?? selectedUserId) : selectedUserId;
-  // For supervisors with only one team, auto-use that team
-  const effectiveTeamId = visibleTeams.length === 1 ? visibleTeams[0].id : selectedTeamId;
+  const effectiveTeamId = visibleTeams.length === 1 ? visibleTeams[0]?.id : selectedTeamId;
 
-  const userPerf = mode === 'person' ? buildUserPerf(effectiveUserId) : null;
-  const teamPerf = mode === 'team' ? buildTeamPerf(effectiveTeamId) : null;
+  const userPerf = mode === 'person' && effectiveUserId ? buildUserPerf(effectiveUserId) : null;
+  const teamPerf = mode === 'team' && effectiveTeamId ? buildTeamPerf(effectiveTeamId) : null;
+
+  if (loading) {
+    return (
+      <div className="page-container flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-sm text-muted-foreground">Carregando desempenho...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container animate-fade-in">
@@ -234,7 +276,6 @@ export default function PerformancePage() {
 
       {/* ── Selector strip ── */}
       <div className="glass-card p-3 mb-5 flex items-center gap-3 flex-wrap">
-        {/* Mode toggle — hidden for members (only person view) */}
         {canSeeTeam && (
           <div className="flex gap-1 p-0.5 bg-secondary rounded-lg border border-border">
             {(['person', 'team'] as const).map(m => (
@@ -249,7 +290,6 @@ export default function PerformancePage() {
           </div>
         )}
 
-        {/* Selector — members see a static label, others get a dropdown */}
         {mode === 'person' ? (
           role === 'member' ? (
             <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-secondary border border-border text-xs text-foreground">
@@ -264,7 +304,7 @@ export default function PerformancePage() {
                 className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
                 {visibleUsers.map(u => (
                   <option key={u.id} value={u.id}>
-                    {u.name} — {u.role === 'member' ? 'Vendedor' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'director' ? 'Diretor' : 'Admin'}
+                    {u.name} — {u.role === 'member' ? 'Vendedor' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'director' ? 'Diretor' : u.role}
                   </option>
                 ))}
               </select>
@@ -295,7 +335,8 @@ export default function PerformancePage() {
 
       {/* ════════════════ PERSON VIEW ════════════════════════════════════════ */}
       {mode === 'person' && userPerf && (() => {
-        const { u, avgMeetingScore, avgWaScore, overallScore, avgCriteria, waCriteria, trend, radarData, evaluatedMeetings, evals, waAnalyses } = userPerf;
+        const { u, avgMeetingScore, avgWaScore, overallScore, meetCriteria, waCriteria, trend, radarData, meetEvals, waEvals } = userPerf;
+        const teamName = teams.find(t => t.id === u.teamId)?.name;
         return (
           <div className="space-y-5">
             {/* Profile strip */}
@@ -306,14 +347,11 @@ export default function PerformancePage() {
                 <p className="text-lg font-display font-bold">{u.name}</p>
                 <p className="text-xs text-muted-foreground">{u.email}</p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  {MOCK_TEAMS.find(t => t.id === u.teamId) && (
+                  {teamName && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                      {MOCK_TEAMS.find(t => t.id === u.teamId)?.name}
+                      {teamName}
                     </span>
                   )}
-                  <span className={cn('text-[10px] px-2 py-0.5 rounded-full border', u.status === 'active' ? 'bg-success/10 text-success border-success/20' : 'bg-muted text-muted-foreground border-border')}>
-                    {u.status === 'active' ? 'Ativo' : 'Inativo'}
-                  </span>
                   {overallScore !== null && (
                     <span className={cn('text-[10px] px-2 py-0.5 rounded-full border font-bold', scoreBg(overallScore))}>
                       {scoreLabel(overallScore)} · {overallScore}/100
@@ -321,13 +359,12 @@ export default function PerformancePage() {
                   )}
                 </div>
               </div>
-              {overallScore !== null && (
+              {overallScore !== null ? (
                 <div className={cn('w-20 h-20 rounded-full border-4 flex flex-col items-center justify-center flex-shrink-0', overallScore >= 85 ? 'border-success' : overallScore >= 70 ? 'border-primary' : overallScore >= 50 ? 'border-warning' : 'border-destructive')}>
                   <span className={cn('text-2xl font-bold font-mono', scoreColor(overallScore))}>{overallScore}</span>
                   <span className="text-[9px] text-muted-foreground uppercase">Score</span>
                 </div>
-              )}
-              {overallScore === null && (
+              ) : (
                 <div className="w-20 h-20 rounded-full border-4 border-border flex flex-col items-center justify-center flex-shrink-0 opacity-30">
                   <span className="text-lg font-bold text-muted-foreground">—</span>
                   <span className="text-[9px] text-muted-foreground uppercase">Sem dados</span>
@@ -337,17 +374,15 @@ export default function PerformancePage() {
 
             {/* KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <ScoreCard label="Score Médio Reuniões" value={avgMeetingScore ?? '—'} icon={Video} sub={`${evaluatedMeetings.length} reuniões avaliadas`} />
-              <ScoreCard label="Score Médio WhatsApp" value={avgWaScore ?? '—'} icon={MessageSquare} sub={`${waAnalyses.length} análises IA`} />
-              <ScoreCard label="Reuniões Totais" value={evaluatedMeetings.length} icon={Calendar} sub="concluídas" />
+              <ScoreCard label="Score Médio Reuniões" value={avgMeetingScore ?? '—'} icon={Video} sub={`${meetEvals.length} reuniões avaliadas`} />
+              <ScoreCard label="Score Médio WhatsApp" value={avgWaScore ?? '—'} icon={MessageSquare} sub={`${waEvals.length} conversas avaliadas`} />
+              <ScoreCard label="Total Avaliações" value={meetEvals.length + waEvals.length} icon={Calendar} sub="reuniões + WhatsApp" />
               <ScoreCard label="Score Global" value={overallScore ?? '—'} icon={Award} sub="média reuniões + WhatsApp" />
             </div>
 
             {/* Charts row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-              {/* Radar — meeting criteria */}
-              {radarData && (
+              {radarData && radarData.length > 0 && (
                 <div className="glass-card p-4 lg:col-span-1">
                   <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
                     <Video className="w-3.5 h-3.5 text-primary" /> Critérios de Reunião
@@ -362,7 +397,6 @@ export default function PerformancePage() {
                 </div>
               )}
 
-              {/* Score trend */}
               {trend.length > 1 && (
                 <div className="glass-card p-4 lg:col-span-2">
                   <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
@@ -386,88 +420,56 @@ export default function PerformancePage() {
 
             {/* Meeting + WhatsApp breakdowns */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-              {/* Meeting criteria breakdown */}
-              {avgCriteria && (
+              {meetCriteria.length > 0 && (
                 <div className="glass-card p-4">
                   <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
                     <Video className="w-3.5 h-3.5 text-primary" /> Detalhamento — Reuniões
+                    <span className="text-[10px] text-muted-foreground ml-1">({meetEvals.length} avaliações)</span>
                   </p>
                   <div className="space-y-2.5">
-                    <MiniBar label="Rapport" score={avgCriteria.rapport} />
-                    <MiniBar label="Descoberta" score={avgCriteria.discovery} />
-                    <MiniBar label="Apresentação" score={avgCriteria.presentation} />
-                    <MiniBar label="Objeções" score={avgCriteria.objections} />
-                    <MiniBar label="Próximos Passos" score={avgCriteria.nextSteps} />
-                  </div>
-                  {evals.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-border/50">
-                      <p className="text-[10px] text-muted-foreground font-semibold mb-2 uppercase tracking-wide">Última análise IA</p>
-                      <p className="text-[11px] text-muted-foreground/80 leading-snug">{evals[evals.length - 1]?.aiSummary || 'Sem resumo.'}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* WhatsApp criteria */}
-              {waCriteria && waCriteria.length > 0 && (
-                <div className="glass-card p-4">
-                  <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-                    <MessageSquare className="w-3.5 h-3.5 text-success" /> Detalhamento — WhatsApp
-                    <span className="text-[10px] text-muted-foreground ml-1">({waAnalyses.length} análises)</span>
-                  </p>
-                  <div className="space-y-2.5">
-                    {waCriteria.map(c => (
-                      <MiniBar key={c.label} label={c.label} score={c.score} />
+                    {meetCriteria.map(c => (
+                      <MiniBar key={c.label} label={c.label} score={c.score} weight={c.weight} />
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Placeholder if no WA analyses */}
-              {(!waCriteria || waCriteria.length === 0) && (
+              {waCriteria.length > 0 ? (
+                <div className="glass-card p-4">
+                  <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-success" /> Detalhamento — WhatsApp
+                    <span className="text-[10px] text-muted-foreground ml-1">({waEvals.length} avaliações)</span>
+                  </p>
+                  <div className="space-y-2.5">
+                    {waCriteria.map(c => (
+                      <MiniBar key={c.label} label={c.label} score={c.score} weight={c.weight} />
+                    ))}
+                  </div>
+                </div>
+              ) : (
                 <div className="glass-card p-4 flex flex-col items-center justify-center gap-2 text-center">
                   <Brain className="w-8 h-8 opacity-15" />
-                  <p className="text-xs text-muted-foreground">Nenhuma análise de WhatsApp encontrada</p>
-                  <p className="text-[10px] text-muted-foreground/60">Abra uma conversa no WhatsApp e clique em "IA" para analisar</p>
+                  <p className="text-xs text-muted-foreground">Nenhuma avaliação de WhatsApp</p>
+                  <p className="text-[10px] text-muted-foreground/60">A avaliação automática roda todo dia à meia-noite</p>
                 </div>
               )}
             </div>
-
-            {/* Recent meetings table */}
-            {evaluatedMeetings.length > 0 && (
-              <div className="glass-card p-4">
-                <p className="text-xs font-semibold mb-3 flex items-center gap-1.5">
-                  <BarChart3 className="w-3.5 h-3.5 text-accent" /> Reuniões Avaliadas
-                </p>
-                <div className="space-y-2">
-                  {evaluatedMeetings.slice().reverse().map(m => (
-                    <div key={m.id} className="flex items-center gap-3 py-2 border-b border-border/40 last:border-0">
-                      <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-sm font-bold font-mono', scoreBg(m.score ?? 0))}>
-                        <span className={scoreColor(m.score ?? 0)}>{m.score}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{m.title}</p>
-                        <p className="text-[10px] text-muted-foreground">{m.clientName} · {new Date(m.date).toLocaleDateString('pt-BR')}</p>
-                      </div>
-                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border', scoreBg(m.score ?? 0))}>
-                        <span className={scoreColor(m.score ?? 0)}>{scoreLabel(m.score ?? 0)}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         );
       })()}
 
+      {mode === 'person' && !userPerf && !loading && (
+        <div className="glass-card p-8 text-center">
+          <Brain className="w-10 h-10 mx-auto opacity-15 mb-3" />
+          <p className="text-sm text-muted-foreground">Selecione um vendedor para ver o desempenho</p>
+        </div>
+      )}
+
       {/* ════════════════ TEAM VIEW ═══════════════════════════════════════════ */}
       {mode === 'team' && teamPerf && (() => {
         const { team, members, avgOverall, totalMeetings, totalWaAnalyses } = teamPerf;
-        const supervisor = MOCK_USERS.find(u => u.id === team.supervisorId);
+        const supervisor = users.find(u => u.id === team.supervisorId);
 
-        // Comparison bar chart
         const barData = members
           .filter(m => m.overallScore !== null)
           .map(m => ({
@@ -478,7 +480,6 @@ export default function PerformancePage() {
 
         return (
           <div className="space-y-5">
-
             {/* Team header */}
             <div className="glass-card p-4 flex items-center gap-4">
               <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -491,9 +492,6 @@ export default function PerformancePage() {
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
                     {members.length} membros
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
-                    Meta: {team.goal ?? '—'} reuniões/mês
-                  </span>
                   {avgOverall !== null && (
                     <span className={cn('text-[10px] px-2 py-0.5 rounded-full border font-bold', scoreBg(avgOverall))}>
                       {scoreLabel(avgOverall)} · {avgOverall}/100
@@ -501,10 +499,14 @@ export default function PerformancePage() {
                   )}
                 </div>
               </div>
-              {avgOverall !== null && (
+              {avgOverall !== null ? (
                 <div className={cn('w-20 h-20 rounded-full border-4 flex flex-col items-center justify-center flex-shrink-0', avgOverall >= 85 ? 'border-success' : avgOverall >= 70 ? 'border-primary' : avgOverall >= 50 ? 'border-warning' : 'border-destructive')}>
                   <span className={cn('text-2xl font-bold font-mono', scoreColor(avgOverall))}>{avgOverall}</span>
                   <span className="text-[9px] text-muted-foreground uppercase">Médio</span>
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-full border-4 border-border flex flex-col items-center justify-center flex-shrink-0 opacity-30">
+                  <span className="text-lg text-muted-foreground">—</span>
                 </div>
               )}
             </div>

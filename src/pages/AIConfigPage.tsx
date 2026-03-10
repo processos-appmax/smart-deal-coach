@@ -31,7 +31,7 @@ export interface EvalCriteria {
   negativeSignals: string[];
 }
 
-const DEFAULT_MEETING_CRITERIA: EvalCriteria[] = [
+export const DEFAULT_MEETING_CRITERIA: EvalCriteria[] = [
   {
     id: 'rapport', label: 'Rapport', weight: 20,
     description: 'Conexão emocional e abertura do cliente durante a conversa',

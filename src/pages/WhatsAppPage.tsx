@@ -24,6 +24,8 @@ import { loadAIConfig } from '@/lib/aiConfigService';
 
 import { CONFIG } from '@/lib/config';
 import { callOpenAI } from '@/lib/openaiProxy';
+import { supabase } from '@/integrations/supabase/client';
+import { getSaasEmpresaId } from '@/lib/saas';
 
 const EVOLUTION_API_URL = CONFIG.EVOLUTION_API_URL;
 const EVOLUTION_API_TOKEN = CONFIG.EVOLUTION_API_TOKEN;
@@ -39,6 +41,7 @@ interface Chat {
   lastMessageTs: number;
   lastMessageFromMe: boolean; // used to detect new incoming msgs on poll
   unread: number;
+  aiScore?: number; // 0-100, from cron evaluation
 }
 
 type MsgType = 'text' | 'image' | 'video' | 'audio' | 'ptt' | 'document' | 'sticker' | 'location' | 'contact' | 'unknown';
@@ -1057,6 +1060,38 @@ export default function WhatsAppPage() {
     return () => clearInterval(t);
   }, [activeInstance?.name, activeInstance?.connectionStatus]);
 
+  // Load AI scores from DB for current instance
+  const [chatScores, setChatScores] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (!activeInstance) return;
+    const loadScores = async () => {
+      try {
+        const empresaId = await getSaasEmpresaId();
+        const { data } = await (supabase as any)
+          .schema('saas')
+          .from('analises_ia')
+          .select('contato_telefone,score,periodo_ref')
+          .eq('empresa_id', empresaId)
+          .eq('tipo_contexto', 'whatsapp')
+          .eq('instancia_nome', activeInstance.name)
+          .not('contato_telefone', 'is', null)
+          .order('periodo_ref', { ascending: false });
+
+        if (data) {
+          const map = new Map<string, number>();
+          for (const row of data) {
+            // Keep only the most recent score per phone
+            if (!map.has(row.contato_telefone)) {
+              map.set(row.contato_telefone, row.score);
+            }
+          }
+          setChatScores(map);
+        }
+      } catch { /* silent */ }
+    };
+    loadScores();
+  }, [activeInstance?.name]);
+
 
 
   const filteredChats = (() => {
@@ -1630,9 +1665,16 @@ export default function WhatsAppPage() {
                       {chat.lastMessage || chat.phone}
                     </p>
                   </div>
-                  {chat.name && chat.name !== chat.phone && (
-                    <p className="text-[10px] text-muted-foreground/50 font-mono truncate">{chat.phone}</p>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {chat.name && chat.name !== chat.phone && (
+                      <p className="text-[10px] text-muted-foreground/50 font-mono truncate">{chat.phone}</p>
+                    )}
+                    {(chatScores.get(chat.phone) ?? chat.aiScore) != null && (() => {
+                      const s = chatScores.get(chat.phone) ?? chat.aiScore!;
+                      const color = s >= 85 ? 'text-success' : s >= 70 ? 'text-primary' : s >= 50 ? 'text-warning' : 'text-destructive';
+                      return <span className={cn('text-[9px] font-bold font-mono ml-auto flex-shrink-0', color)}>{s}</span>;
+                    })()}
+                  </div>
                 </div>
               </button>
               );
