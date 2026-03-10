@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { loadAIConfig, saveAIConfig } from '@/lib/aiConfigService';
 import { useAppConfig } from '@/contexts/AppConfigContext';
+import { callOpenAI } from '@/lib/openaiProxy';
 
 // ─── Storage keys (shared with WhatsApp analysis panel) ──────────────────────
 export const AI_CONFIG_STORAGE = {
@@ -443,20 +444,15 @@ export default function AIConfigPage() {
       `- ${c.label} (peso ${c.weight}%): ${c.description}`
     ).join('\n');
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Analise esta conversa de exemplo usando os critérios abaixo e retorne APENAS JSON:\n\nCritérios:\n${criteriaText}\n\nConversa:\n${sampleTranscript}\n\nJSON esperado:\n{"totalScore":<0-100>,"summary":"<2 frases>","breakdown":[{"label":"<critério>","score":<0-100>,"feedback":"<1 frase>"}]}` },
-          ],
-          temperature: 0.3, max_tokens: 800,
-        }),
+      const data = await callOpenAI(token, {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Analise esta conversa de exemplo usando os critérios abaixo e retorne APENAS JSON:\n\nCritérios:\n${criteriaText}\n\nConversa:\n${sampleTranscript}\n\nJSON esperado:\n{"totalScore":<0-100>,"summary":"<2 frases>","breakdown":[{"label":"<critério>","score":<0-100>,"feedback":"<1 frase>"}]}` },
+        ],
+        temperature: 0.3,
+        max_tokens: 800,
       });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
-      const data = await res.json();
       const raw = (data.choices?.[0]?.message?.content || '').replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       setTestResult(JSON.parse(raw));
     } catch (e: any) {

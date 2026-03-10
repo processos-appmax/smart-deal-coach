@@ -22,6 +22,7 @@ import { AI_CONFIG_STORAGE, DEFAULT_WHATSAPP_CRITERIA } from '@/pages/AIConfigPa
 import { loadAIConfig } from '@/lib/aiConfigService';
 
 import { CONFIG } from '@/lib/config';
+import { callOpenAI } from '@/lib/openaiProxy';
 
 const EVOLUTION_API_URL = CONFIG.EVOLUTION_API_URL;
 const EVOLUTION_API_TOKEN = CONFIG.EVOLUTION_API_TOKEN;
@@ -296,29 +297,15 @@ Responda APENAS com JSON vÃ¡lido no seguinte formato (sem markdown, sem explicaÃ
   ]
 }`;
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: aiModel || 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: 0.3,
-          max_tokens: 1500,
-        }),
+      const data = await callOpenAI(apiToken, {
+        model: aiModel || 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 1500,
       });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
       const raw = data.choices?.[0]?.message?.content || '';
       // Strip possible markdown fences
       const jsonStr = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
