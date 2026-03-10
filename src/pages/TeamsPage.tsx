@@ -15,22 +15,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { loadTeams, createTeam, updateTeam, deleteTeam } from '@/lib/teamsService';
 import { loadAllowedUsers, type AllowedUser } from '@/lib/accessControl';
+import { loadAreas, type AreaRecord } from '@/lib/areasService';
 
 // ─── Create / Edit Team Modal ─────────────────────────────────────────────────
 function TeamModal({
   team,
   users,
+  areas,
   onClose,
   onSave,
 }: {
   team?: Team;
   users: AllowedUser[];
+  areas: AreaRecord[];
   onClose: () => void;
   onSave: (data: Partial<Team>) => void;
 }) {
   const isEdit = !!team;
   const [name, setName] = useState(team?.name ?? '');
   const [supervisorId, setSupervisorId] = useState(team?.supervisorId ?? '');
+  const [areaId, setAreaId] = useState(team?.areaId ?? '');
   const [memberIds, setMemberIds] = useState<string[]>(team?.memberIds ?? []);
   const [goal, setGoal] = useState(String(team?.goal ?? 40));
 
@@ -42,7 +46,7 @@ function TeamModal({
 
   const handleSave = () => {
     if (!name.trim()) return;
-    onSave({ name: name.trim(), supervisorId, memberIds, goal: Number(goal) });
+    onSave({ name: name.trim(), supervisorId, areaId: areaId || undefined, memberIds, goal: Number(goal) });
     onClose();
   };
 
@@ -75,6 +79,27 @@ function TeamModal({
                     <div className="flex items-center gap-2">
                       {u.name}
                       <span className="text-muted-foreground">({u.role})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1.5">Área <span className="text-muted-foreground font-normal">(opcional)</span></label>
+            <Select value={areaId || '__none__'} onValueChange={v => setAreaId(v === '__none__' ? '' : v)}>
+              <SelectTrigger className="h-9 text-xs bg-secondary border-border">
+                <SelectValue placeholder="Selecione uma área..." />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="__none__" className="text-xs text-muted-foreground">
+                  Nenhuma área
+                </SelectItem>
+                {areas.map(a => (
+                  <SelectItem key={a.id} value={a.id} className="text-xs">
+                    <div className="flex items-center gap-2">
+                      {a.nome}
+                      {a.gerente_nome && <span className="text-muted-foreground">({a.gerente_nome})</span>}
                     </div>
                   </SelectItem>
                 ))}
@@ -168,6 +193,7 @@ export default function TeamsPage() {
   const { toast } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
   const [users, setUsers] = useState<AllowedUser[]>([]);
+  const [areas, setAreas] = useState<AreaRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -177,9 +203,10 @@ export default function TeamsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [teamsData, usersData] = await Promise.all([loadTeams(), loadAllowedUsers()]);
+      const [teamsData, usersData, areasData] = await Promise.all([loadTeams(), loadAllowedUsers(), loadAreas()]);
       setTeams(teamsData);
       setUsers(usersData);
+      setAreas(areasData);
       if (teamsData.length > 0 && !selected) setSelected(teamsData[0].id);
     } catch (e: any) {
       console.error('[teams] fetch error:', e);
@@ -198,6 +225,8 @@ export default function TeamsPage() {
     const email = userId.replace(/^(user_|google_)/, '');
     return users.find(u => u.email === email);
   };
+
+  const findArea = (areaId?: string): AreaRecord | undefined => areas.find(a => a.id === areaId);
 
   const teamStats = team ? [
     { label: 'Membros', value: String(team.memberIds.length), icon: Users },
@@ -306,7 +335,12 @@ export default function TeamsPage() {
                     <ChevronRight className={cn('w-4 h-4 text-muted-foreground transition-transform', selected === t.id && 'rotate-90 text-primary')} />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {findArea(t.areaId) && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
+                      {findArea(t.areaId)!.nome}
+                    </span>
+                  )}
                   <span className="text-xs text-muted-foreground">{memberCount} membros</span>
                   {t.goal && <span className="text-xs text-muted-foreground">· Meta: {t.goal}</span>}
                 </div>
@@ -334,6 +368,17 @@ export default function TeamsPage() {
                   <Pencil className="w-3 h-3" /> Editar
                 </Button>
               </div>
+              {findArea(team.areaId) && (
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xs text-muted-foreground">Área:</span>
+                  <span className="text-xs px-2 py-0.5 rounded-lg bg-primary/10 text-primary border border-primary/20 font-medium">
+                    {findArea(team.areaId)!.nome}
+                  </span>
+                  {findArea(team.areaId)!.gerente_nome && (
+                    <span className="text-xs text-muted-foreground">· Gerente: {findArea(team.areaId)!.gerente_nome}</span>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 {teamStats.map(s => (
                   <div key={s.label} className="text-center p-3 rounded-xl bg-muted/50">
@@ -409,8 +454,8 @@ export default function TeamsPage() {
         )}
       </div>
 
-      {showCreate && <TeamModal users={users} onClose={() => setShowCreate(false)} onSave={handleCreate} />}
-      {editTarget && <TeamModal team={editTarget} users={users} onClose={() => setEditTarget(null)} onSave={handleEdit} />}
+      {showCreate && <TeamModal users={users} areas={areas} onClose={() => setShowCreate(false)} onSave={handleCreate} />}
+      {editTarget && <TeamModal team={editTarget} users={users} areas={areas} onClose={() => setEditTarget(null)} onSave={handleEdit} />}
       {deleteTarget && <DeleteTeamModal team={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} />}
     </div>
   );
