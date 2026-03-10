@@ -807,37 +807,19 @@ export default function AdminPage() {
                         </p>
                       )}
                       {/* Model selector */}
-                      <div className="pt-1">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <p className="text-[11px] font-medium text-muted-foreground">Modelo:</p>
-                          {models[f.key] === f.recommended && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">Recomendado</span>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                          {AI_MODELS.map(m => {
-                            const selected = models[f.key] === m.id;
-                            const isRecommended = m.id === f.recommended;
-                            return (
-                              <button
-                                key={m.id}
-                                onClick={() => setModuleModel(f.key as ModuleAIKey, m.id)}
-                                className={cn(
-                                  'text-left px-2.5 py-1.5 rounded-lg border transition-all text-[11px]',
-                                  selected
-                                    ? 'bg-primary/15 border-primary/40 text-primary font-medium ring-1 ring-primary/20'
-                                    : 'border-border/50 text-muted-foreground hover:bg-muted/50 hover:border-border'
-                                )}
-                              >
-                                <div className="flex items-center gap-1">
-                                  <span className="font-medium">{m.label}</span>
-                                  {isRecommended && !selected && <span className="text-[8px] text-primary/60">*</span>}
-                                </div>
-                                <p className="text-[9px] text-muted-foreground/70 leading-tight mt-0.5">{m.badge}</p>
-                              </button>
-                            );
-                          })}
-                        </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <p className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Modelo:</p>
+                        <select
+                          value={models[f.key]}
+                          onChange={e => setModuleModel(f.key as ModuleAIKey, e.target.value as any)}
+                          className="flex-1 text-xs px-2.5 py-1.5 rounded-lg bg-background border border-border focus:border-primary/50 focus:ring-1 focus:ring-primary/20 outline-none"
+                        >
+                          {AI_MODELS.map(m => (
+                            <option key={m.id} value={m.id}>
+                              {m.label} — {m.desc}{m.id === f.recommended ? ' (recomendado)' : ''}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   );
