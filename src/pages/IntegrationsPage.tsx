@@ -737,168 +737,182 @@ function EvolutionPanel() {
   );
 }
 
-// ─── Mock webhook logs ─────────────────────────────────────────────────────────
+// ─── Webhook Logs (from saas.eventos_webhooks) ──────────────────────────────
 interface WebhookLog {
   id: string;
-  direction: 'inbound' | 'outbound';
-  source: string;
-  event: string;
-  status: 'success' | 'error' | 'pending';
-  statusCode?: number;
-  payload: string;
-  response?: string;
-  timestamp: string;
-  duration: number;
+  evento: string;
+  status: 'sucesso' | 'erro' | 'pendente';
+  payload: any;
+  tentativas: number;
+  ultimo_erro: string | null;
+  processado_em: string | null;
+  criado_em: string;
 }
 
-const MOCK_WEBHOOK_LOGS: WebhookLog[] = [];
-
 function WebhookLogs() {
+  const [logs, setLogs] = useState<WebhookLog[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<WebhookLog | null>(null);
-  const [dirFilter, setDirFilter] = useState<'all' | 'inbound' | 'outbound'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error' | 'pending'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'sucesso' | 'erro' | 'pendente'>('all');
 
-  const filtered = MOCK_WEBHOOK_LOGS.filter(l => {
-    const matchDir = dirFilter === 'all' || l.direction === dirFilter;
-    const matchStatus = statusFilter === 'all' || l.status === statusFilter;
-    return matchDir && matchStatus;
-  });
+  const loadLogs = useCallback(async () => {
+    try {
+      const empresaId = await getSaasEmpresaId();
+      const { data, error } = await (supabase as any)
+        .schema('saas')
+        .from('eventos_webhooks')
+        .select('id, evento, status, payload, tentativas, ultimo_erro, processado_em, criado_em')
+        .eq('empresa_id', empresaId)
+        .order('criado_em', { ascending: false })
+        .limit(200);
+
+      if (!error && data) setLogs(data);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadLogs(); }, [loadLogs]);
+
+  const filtered = logs.filter(l => statusFilter === 'all' || l.status === statusFilter);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayLogs = logs.filter(l => l.criado_em?.startsWith(todayStr));
 
   const statusConfig = {
-    success: { icon: CheckCheck, class: 'text-success bg-success/10 border-success/20' },
-    error: { icon: AlertTriangle, class: 'text-destructive bg-destructive/10 border-destructive/20' },
-    pending: { icon: Loader2, class: 'text-warning bg-warning/10 border-warning/20' },
+    sucesso: { icon: CheckCheck, class: 'text-success bg-success/10 border-success/20', label: 'Sucesso' },
+    erro: { icon: AlertTriangle, class: 'text-destructive bg-destructive/10 border-destructive/20', label: 'Erro' },
+    pendente: { icon: Loader2, class: 'text-warning bg-warning/10 border-warning/20', label: 'Pendente' },
+  };
+
+  const durationMs = (log: WebhookLog): number | null => {
+    if (!log.processado_em || !log.criado_em) return null;
+    return new Date(log.processado_em).getTime() - new Date(log.criado_em).getTime();
   };
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: 'Total hoje', value: MOCK_WEBHOOK_LOGS.length, color: 'text-foreground' },
-          { label: 'Sucesso', value: MOCK_WEBHOOK_LOGS.filter(l => l.status === 'success').length, color: 'text-success' },
-          { label: 'Erros', value: MOCK_WEBHOOK_LOGS.filter(l => l.status === 'error').length, color: 'text-destructive' },
-          { label: 'Pendentes', value: MOCK_WEBHOOK_LOGS.filter(l => l.status === 'pending').length, color: 'text-warning' },
-        ].map(s => (
-          <div key={s.label} className="glass-card p-3 rounded-xl text-center">
-            <p className={cn('text-2xl font-bold', s.color)}>{s.value}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
-          </div>
+      <div className="flex items-center justify-between">
+        <div className="grid grid-cols-4 gap-3 flex-1">
+          {[
+            { label: 'Total hoje', value: todayLogs.length, color: 'text-foreground' },
+            { label: 'Sucesso', value: todayLogs.filter(l => l.status === 'sucesso').length, color: 'text-success' },
+            { label: 'Erros', value: todayLogs.filter(l => l.status === 'erro').length, color: 'text-destructive' },
+            { label: 'Pendentes', value: todayLogs.filter(l => l.status === 'pendente').length, color: 'text-warning' },
+          ].map(s => (
+            <div key={s.label} className="glass-card p-3 rounded-xl text-center">
+              <p className={cn('text-2xl font-bold', s.color)}>{s.value}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => { setLoading(true); loadLogs(); }} className="ml-3 p-2 rounded-lg hover:bg-muted" title="Atualizar">
+          <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        {(['all', 'sucesso', 'erro', 'pendente'] as const).map(s => (
+          <button key={s} onClick={() => setStatusFilter(s)}
+            className={cn('text-xs px-2.5 py-1.5 rounded-lg border transition-all',
+              statusFilter === s ? 'bg-primary/15 border-primary/30 text-primary' : 'border-border text-muted-foreground hover:bg-muted')}>
+            {{ all: 'Todos', sucesso: '✓ Sucesso', erro: '✕ Erro', pendente: '◷ Pendente' }[s]}
+          </button>
         ))}
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex gap-1 p-1 bg-secondary rounded-lg border border-border">
-          {(['all', 'inbound', 'outbound'] as const).map(d => (
-            <button key={d} onClick={() => setDirFilter(d)}
-              className={cn('flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors',
-                dirFilter === d ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
-              {d === 'inbound' ? <ArrowDown className="w-3 h-3" /> : d === 'outbound' ? <ArrowUp className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
-              {{ all: 'Todos', inbound: 'Recebidos', outbound: 'Enviados' }[d]}
-            </button>
-          ))}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
-        <div className="flex gap-1.5">
-          {(['all', 'success', 'error', 'pending'] as const).map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={cn('text-xs px-2.5 py-1.5 rounded-lg border transition-all',
-                statusFilter === s ? 'bg-primary/15 border-primary/30 text-primary' : 'border-border text-muted-foreground hover:bg-muted')}>
-              {{ all: 'Todos', success: '✓ Sucesso', error: '✕ Erro', pending: '◷ Pendente' }[s]}
-            </button>
-          ))}
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-sm text-muted-foreground">
+          Nenhum log de webhook encontrado.
         </div>
-      </div>
+      ) : (
+        <div className="flex gap-4">
+          <div className={cn('glass-card overflow-hidden flex-1', selected && 'lg:w-1/2')}>
+            <table className="w-full data-table">
+              <thead>
+                <tr>
+                  <th className="text-left">Evento</th>
+                  <th className="text-center">Status</th>
+                  <th className="text-center hidden lg:table-cell">Tentativas</th>
+                  <th className="text-center hidden lg:table-cell">Duração</th>
+                  <th className="text-center">Data/Hora</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(log => {
+                  const sc = statusConfig[log.status] || statusConfig.pendente;
+                  const ScIcon = sc.icon;
+                  const dur = durationMs(log);
+                  return (
+                    <tr key={log.id} className={cn('cursor-pointer', selected?.id === log.id && 'bg-primary/5')}
+                      onClick={() => setSelected(selected?.id === log.id ? null : log)}>
+                      <td>
+                        <p className="text-xs font-medium font-mono">{log.evento}</p>
+                      </td>
+                      <td className="text-center">
+                        <span className={cn('inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border', sc.class)}>
+                          <ScIcon className="w-2.5 h-2.5" />
+                          {sc.label}
+                        </span>
+                      </td>
+                      <td className="text-center hidden lg:table-cell">
+                        <span className="text-xs text-muted-foreground">{log.tentativas}</span>
+                      </td>
+                      <td className="text-center hidden lg:table-cell">
+                        <span className={cn('text-xs', dur && dur > 1000 ? 'text-warning' : 'text-muted-foreground')}>
+                          {dur != null ? `${dur}ms` : '—'}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(log.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-      <div className="flex gap-4">
-        <div className={cn('glass-card overflow-hidden flex-1', selected && 'lg:w-1/2')}>
-          <table className="w-full data-table">
-            <thead>
-              <tr>
-                <th className="text-left">Evento</th>
-                <th className="text-center">Direção</th>
-                <th className="text-center">Status</th>
-                <th className="text-center hidden lg:table-cell">Código</th>
-                <th className="text-center hidden lg:table-cell">Duração</th>
-                <th className="text-center">Hora</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(log => {
-                const sc = statusConfig[log.status];
-                const ScIcon = sc.icon;
-                return (
-                  <tr key={log.id} className={cn('cursor-pointer', selected?.id === log.id && 'bg-primary/5')}
-                    onClick={() => setSelected(selected?.id === log.id ? null : log)}>
-                    <td>
-                      <p className="text-xs font-medium">{log.source}</p>
-                      <p className="text-[10px] text-muted-foreground font-mono">{log.event}</p>
-                    </td>
-                    <td className="text-center">
-                      <span className={cn('inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border',
-                        log.direction === 'inbound' ? 'bg-info/10 text-info border-info/20' : 'bg-accent/10 text-accent border-accent/20')}>
-                        {log.direction === 'inbound' ? <><ArrowDown className="w-2.5 h-2.5" /> Recebido</> : <><ArrowUp className="w-2.5 h-2.5" /> Enviado</>}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <span className={cn('inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border', sc.class)}>
-                        <ScIcon className="w-2.5 h-2.5" />
-                        {log.status === 'success' ? 'Sucesso' : log.status === 'error' ? 'Erro' : 'Pendente'}
-                      </span>
-                    </td>
-                    <td className="text-center hidden lg:table-cell">
-                      <span className={cn('text-xs font-mono font-semibold',
-                        log.statusCode && log.statusCode >= 400 ? 'text-destructive' : log.statusCode ? 'text-success' : 'text-muted-foreground')}>
-                        {log.statusCode || '—'}
-                      </span>
-                    </td>
-                    <td className="text-center hidden lg:table-cell">
-                      <span className={cn('text-xs', log.duration > 1000 ? 'text-warning' : 'text-muted-foreground')}>
-                        {log.duration ? `${log.duration}ms` : '—'}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <span className="text-[10px] text-muted-foreground">
-                        {new Date(log.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {selected && (
-          <div className="w-full lg:w-[360px] flex-shrink-0 glass-card p-4 space-y-3 animate-slide-in">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold">Detalhes do Webhook</h4>
-              <button onClick={() => setSelected(null)} className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded">
-                <X className="w-3 h-3 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Fonte</span><span className="font-medium">{selected.source}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Evento</span><span className="font-mono text-primary">{selected.event}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Direção</span><span>{selected.direction === 'inbound' ? '↓ Recebido' : '↑ Enviado'}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Status HTTP</span><span className={cn('font-bold', selected.statusCode && selected.statusCode >= 400 ? 'text-destructive' : 'text-success')}>{selected.statusCode || '—'}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Duração</span><span>{selected.duration ? `${selected.duration}ms` : '—'}</span></div>
-            </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Payload</p>
-              <pre className="text-[10px] font-mono bg-secondary border border-border rounded-lg p-3 overflow-x-auto text-muted-foreground whitespace-pre-wrap break-all">
-                {JSON.stringify(JSON.parse(selected.payload), null, 2)}
-              </pre>
-            </div>
-            {selected.response && (
+          {selected && (
+            <div className="w-full lg:w-[360px] flex-shrink-0 glass-card p-4 space-y-3 animate-slide-in">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold">Detalhes do Evento</h4>
+                <button onClick={() => setSelected(null)} className="w-5 h-5 flex items-center justify-center hover:bg-muted rounded">
+                  <X className="w-3 h-3 text-muted-foreground" />
+                </button>
+              </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between"><span className="text-muted-foreground">Evento</span><span className="font-mono text-primary">{selected.evento}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="font-medium">{statusConfig[selected.status]?.label || selected.status}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Tentativas</span><span>{selected.tentativas}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Criado em</span><span>{new Date(selected.criado_em).toLocaleString('pt-BR')}</span></div>
+                {selected.processado_em && (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Processado em</span><span>{new Date(selected.processado_em).toLocaleString('pt-BR')}</span></div>
+                )}
+              </div>
+              {selected.ultimo_erro && (
+                <div>
+                  <p className="text-[10px] text-destructive font-semibold uppercase tracking-wide mb-1.5">Último Erro</p>
+                  <pre className="text-[10px] font-mono bg-destructive/5 border border-destructive/20 rounded-lg p-3 overflow-x-auto text-destructive whitespace-pre-wrap break-all">
+                    {selected.ultimo_erro}
+                  </pre>
+                </div>
+              )}
               <div>
-                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Response</p>
-                <pre className="text-[10px] font-mono bg-secondary border border-border rounded-lg p-3 overflow-x-auto text-muted-foreground whitespace-pre-wrap break-all">
-                  {JSON.stringify(JSON.parse(selected.response), null, 2)}
+                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-1.5">Payload</p>
+                <pre className="text-[10px] font-mono bg-secondary border border-border rounded-lg p-3 overflow-x-auto text-muted-foreground whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+                  {JSON.stringify(selected.payload, null, 2)}
                 </pre>
               </div>
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
