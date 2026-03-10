@@ -413,6 +413,28 @@ function GooglePanel() {
   );
 }
 
+// Sync API instances to DB so that assignInstanceToUser can find them
+async function syncInstancesToDbFromPage(apiInstances: EvolutionInstance[]) {
+  const empresaId = await getSaasEmpresaId();
+  const statusMap: Record<string, string> = { open: 'conectada', close: 'desconectada', connecting: 'conectando' };
+  for (const inst of apiInstances) {
+    await (supabase as any)
+      .schema('saas')
+      .from('instancias_whatsapp')
+      .upsert(
+        {
+          empresa_id: empresaId,
+          nome: inst.name,
+          telefone: inst.ownerJid?.replace('@s.whatsapp.net', '') || null,
+          status: statusMap[inst.connectionStatus] || 'desconectada',
+          owner_jid: inst.ownerJid || null,
+          ultimo_evento_em: new Date().toISOString(),
+        },
+        { onConflict: 'empresa_id,nome' },
+      );
+  }
+}
+
 // ─── Evolution Instances Panel ────────────────────────────────────────────────
 function EvolutionPanel() {
   const { toast } = useToast();
@@ -500,7 +522,15 @@ function EvolutionPanel() {
 
       // Then fetch live from Evolution API
       const data = await evolutionFetch('/instance/fetchInstances');
-      setInstances(Array.isArray(data) ? data : []);
+      const apiInstances: EvolutionInstance[] = Array.isArray(data) ? data : [];
+      // Merge DB user assignments into live API data
+      const prevMap = new Map(instances.map(i => [i.name, i.assignedUserEmail]));
+      setInstances(apiInstances.map(inst => ({
+        ...inst,
+        assignedUserEmail: prevMap.get(inst.name) || undefined,
+      })));
+      // Sync live instances to DB in background (so future assignments find the row)
+      syncInstancesToDbFromPage(apiInstances).catch(() => {});
     } catch (e: any) {
       // Only show error if we have no instances at all
       if (instances.length === 0) {

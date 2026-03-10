@@ -175,7 +175,21 @@ export async function assignInstanceToUser(instanceName: string, userId: string)
   const email = userId ? emailFromFrontendId(userId) : '';
   const usuarioId = email ? await resolveEmailToUuid(email) : null;
 
-  // Clear any previous user assignment on this instance
+  // Ensure the instance row exists in DB (it may only exist in the API so far)
+  await (supabase as any)
+    .schema('saas')
+    .from('instancias_whatsapp')
+    .upsert(
+      {
+        empresa_id: empresaId,
+        nome: instanceName,
+        status: 'desconectada',
+        usuario_id: usuarioId,
+      },
+      { onConflict: 'empresa_id,nome' },
+    );
+
+  // Also update explicitly in case upsert on conflict didn't touch usuario_id
   await (supabase as any)
     .schema('saas')
     .from('instancias_whatsapp')
