@@ -1232,15 +1232,20 @@ export default function WhatsAppPage() {
         );
         const list: any[] = data?.participants || (Array.isArray(data) ? data : []);
         const map = new Map<string, string>();
+        console.log('[Group] Participants raw:', JSON.stringify(list.slice(0, 5)));
         for (const p of list) {
           const jid: string = p.id || '';
           const phone = jid.replace(/@.*/, '');
           // Store both the full JID key and just the number part as keys
           if (jid) map.set(jid, phone);
-          // Also map lid if present
-          if (p.lid) map.set(p.lid, phone);
-          if (p.lid) map.set(p.lid.replace(/@.*/, ''), phone);
+          // Also map lid if present (lid is the internal WhatsApp ID)
+          if (p.lid) {
+            const lidClean = (p.lid as string).replace(/@.*/, '');
+            map.set(p.lid, phone);
+            map.set(lidClean, phone);
+          }
         }
+        console.log('[Group] Participant map entries:', Array.from(map.entries()).slice(0, 10));
         setGroupParticipants(map);
       } catch {
         setGroupParticipants(new Map());
@@ -1793,13 +1798,13 @@ export default function WhatsAppPage() {
                     // Resolve LID to real phone number using group participants map
                     const resolvedPhone = (() => {
                       if (!isGroup || !msg.senderPhone) return msg.senderPhone;
-                      // Try direct lookup (already a phone number)
-                      if (/^\d+$/.test(msg.senderPhone) && msg.senderPhone.length > 8) return msg.senderPhone;
                       // Try resolving from participants map (LID → phone)
                       const fromMap = groupParticipants.get(msg.senderPhone) ||
                         groupParticipants.get(msg.senderPhone + '@lid') ||
                         groupParticipants.get(msg.senderPhone + '@s.whatsapp.net');
-                      return fromMap || msg.senderPhone;
+                      if (fromMap) return fromMap;
+                      // If still looks like a LID (not a clean phone number), show as-is
+                      return msg.senderPhone;
                     })();
                     return (
                     <div key={msg.id} className={cn('flex', msg.fromMe ? 'justify-end' : 'justify-start')}>
@@ -1811,8 +1816,11 @@ export default function WhatsAppPage() {
                       )}>
                         {/* ── Group sender label ── */}
                         {isGroup && !msg.fromMe && (resolvedPhone || msg.senderName) && (
-                          <p className="px-3 pt-2 pb-0 text-[10px] font-semibold text-accent truncate">
-                            {msg.senderName || ''}{resolvedPhone ? (msg.senderName ? ` · ${resolvedPhone}` : resolvedPhone) : ''}
+                          <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold truncate">
+                            <span className="text-accent">{msg.senderName || resolvedPhone}</span>
+                            {msg.senderName && resolvedPhone && (
+                              <span className="text-muted-foreground font-normal ml-1">· {resolvedPhone}</span>
+                            )}
                           </p>
                         )}
                         {/* ── Media content ── */}
