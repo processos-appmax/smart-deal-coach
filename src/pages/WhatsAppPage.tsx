@@ -19,6 +19,7 @@ import {
 import { MOCK_USERS, MOCK_TEAMS } from '@/data/mockData';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { AI_CONFIG_STORAGE, DEFAULT_WHATSAPP_CRITERIA } from '@/pages/AIConfigPage';
+import { loadAIConfig } from '@/lib/aiConfigService';
 
 import { CONFIG } from '@/lib/config';
 
@@ -203,10 +204,12 @@ function AIAnalysisPanel({
   chat,
   messages,
   apiToken,
+  aiModel,
 }: {
   chat: { id: string; name: string; phone: string };
   messages: { fromMe: boolean; body: string; timestamp: number }[];
   apiToken: string;
+  aiModel: string;
 }) {
   const { toast } = useToast();
   const [result, setResult] = useState<AIAnalysisResult | null>(() => {
@@ -225,13 +228,28 @@ function AIAnalysisPanel({
     } catch { setResult(null); }
   }, [chat.id]);
 
+  // DB-backed config with localStorage fallback
+  const [dbCriteria, setDbCriteria] = useState<any[] | null>(null);
+  const [dbPrompt, setDbPrompt] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadAIConfig('whatsapp').then(cfg => {
+      if (cfg && cfg.criterios.length > 0) {
+        setDbCriteria(cfg.criterios);
+        if (cfg.prompt_sistema) setDbPrompt(cfg.prompt_sistema);
+      }
+    }).catch(() => {});
+  }, []);
+
   const loadCriteria = () => {
+    if (dbCriteria && dbCriteria.length > 0) return dbCriteria;
     try {
       const stored = localStorage.getItem(AI_CONFIG_STORAGE.WHATSAPP_CRITERIA);
       return stored ? JSON.parse(stored) : DEFAULT_WHATSAPP_CRITERIA;
     } catch { return DEFAULT_WHATSAPP_CRITERIA; }
   };
   const loadPrompt = () => {
+    if (dbPrompt) return dbPrompt;
     try {
       const stored = localStorage.getItem(AI_CONFIG_STORAGE.WHATSAPP_PROMPT);
       return stored ? JSON.parse(stored) : 'Você é um especialista em vendas digitais e atendimento via WhatsApp. Avalie as conversas com foco em efetividade comercial, qualificação de leads e conversão.';
@@ -285,7 +303,7 @@ Responda APENAS com JSON válido no seguinte formato (sem markdown, sem explica�
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: aiModel || 'gpt-4o-mini',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
@@ -309,7 +327,10 @@ Responda APENAS com JSON válido no seguinte formato (sem markdown, sem explica�
       localStorage.setItem(`appmax_ai_analysis_${chat.id}`, JSON.stringify(parsed));
       toast({ title: '✓ Análise concluída!', description: `Score: ${parsed.totalScore}/100` });
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro na análise', description: e.message });
+      const msg = e.message === 'Failed to fetch'
+        ? 'Não foi possível conectar à API OpenAI. Verifique o token e a conexão de internet.'
+        : e.message;
+      toast({ variant: 'destructive', title: 'Erro na análise', description: msg });
     } finally {
       setLoading(false);
     }
@@ -443,7 +464,7 @@ export default function WhatsAppPage() {
   const { toast } = useToast();
   const isAdmin = hasRole(['admin', 'ceo', 'director', 'manager', 'coordinator', 'supervisor']);
   const { instances: evoInstances, loading: evoLoading, refetch: refetchEvo } = useEvolutionInstances();
-  const { tokens } = useAppConfig();
+  const { tokens, models } = useAppConfig();
 
   const [showCreateInst, setShowCreateInst] = useState(false);
   const [qrInstanceName, setQrInstanceName] = useState<string | null>(null);
@@ -1216,6 +1237,7 @@ export default function WhatsAppPage() {
             chat={activeChat}
             messages={messages}
             apiToken={tokens.whatsapp}
+            aiModel={models.whatsapp || 'gpt-4o-mini'}
           />
         )}
 

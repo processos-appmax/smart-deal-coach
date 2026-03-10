@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { loadAIConfig, saveAIConfig } from '@/lib/aiConfigService';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 
 // ─── Storage keys (shared with WhatsApp analysis panel) ──────────────────────
 export const AI_CONFIG_STORAGE = {
@@ -333,21 +335,46 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
+const DEFAULT_MEETING_PROMPT = 'Você é um avaliador especialista em vendas consultivas. Analise a transcrição da reunião e avalie cada critério com base nos sinais identificados. Seja específico e construtivo nos feedbacks.';
+const DEFAULT_WHATSAPP_PROMPT = 'Você é um especialista em vendas digitais e atendimento via WhatsApp. Avalie as conversas com foco em efetividade comercial, qualificação de leads e conversão.';
+
 export default function AIConfigPage() {
   const { toast } = useToast();
+  const { tokens, models } = useAppConfig();
   const [activeType, setActiveType] = useState<'meetings' | 'whatsapp'>('meetings');
-  const [meetingCriteria, setMeetingCriteria] = useState<EvalCriteria[]>(() =>
-    loadFromStorage(AI_CONFIG_STORAGE.MEETINGS_CRITERIA, DEFAULT_MEETING_CRITERIA));
-  const [whatsappCriteria, setWhatsappCriteria] = useState<EvalCriteria[]>(() =>
-    loadFromStorage(AI_CONFIG_STORAGE.WHATSAPP_CRITERIA, DEFAULT_WHATSAPP_CRITERIA));
+  const [meetingCriteria, setMeetingCriteria] = useState<EvalCriteria[]>(DEFAULT_MEETING_CRITERIA);
+  const [whatsappCriteria, setWhatsappCriteria] = useState<EvalCriteria[]>(DEFAULT_WHATSAPP_CRITERIA);
   const [editingCriteria, setEditingCriteria] = useState<EvalCriteria | null>(null);
   const [addingCriteria, setAddingCriteria] = useState(false);
-  const [meetingPrompt, setMeetingPrompt] = useState<string>(() =>
-    loadFromStorage(AI_CONFIG_STORAGE.MEETINGS_PROMPT,
-      'Você é um avaliador especialista em vendas consultivas. Analise a transcrição da reunião e avalie cada critério com base nos sinais identificados. Seja específico e construtivo nos feedbacks.'));
-  const [whatsappPrompt, setWhatsappPrompt] = useState<string>(() =>
-    loadFromStorage(AI_CONFIG_STORAGE.WHATSAPP_PROMPT,
-      'Você é um especialista em vendas digitais e atendimento via WhatsApp. Avalie as conversas com foco em efetividade comercial, qualificação de leads e conversão.'));
+  const [meetingPrompt, setMeetingPrompt] = useState<string>(DEFAULT_MEETING_PROMPT);
+  const [whatsappPrompt, setWhatsappPrompt] = useState<string>(DEFAULT_WHATSAPP_PROMPT);
+
+  // Load from DB on mount
+  useEffect(() => {
+    loadAIConfig('meetings').then(cfg => {
+      if (cfg && cfg.criterios.length > 0) {
+        setMeetingCriteria(cfg.criterios);
+        if (cfg.prompt_sistema) setMeetingPrompt(cfg.prompt_sistema);
+      } else {
+        // Try localStorage as fallback for migration
+        const stored = loadFromStorage(AI_CONFIG_STORAGE.MEETINGS_CRITERIA, null);
+        if (stored) setMeetingCriteria(stored);
+        const storedPrompt = loadFromStorage(AI_CONFIG_STORAGE.MEETINGS_PROMPT, null);
+        if (storedPrompt) setMeetingPrompt(storedPrompt);
+      }
+    });
+    loadAIConfig('whatsapp').then(cfg => {
+      if (cfg && cfg.criterios.length > 0) {
+        setWhatsappCriteria(cfg.criterios);
+        if (cfg.prompt_sistema) setWhatsappPrompt(cfg.prompt_sistema);
+      } else {
+        const stored = loadFromStorage(AI_CONFIG_STORAGE.WHATSAPP_CRITERIA, null);
+        if (stored) setWhatsappCriteria(stored);
+        const storedPrompt = loadFromStorage(AI_CONFIG_STORAGE.WHATSAPP_PROMPT, null);
+        if (storedPrompt) setWhatsappPrompt(storedPrompt);
+      }
+    });
+  }, []);
 
   const criteria = activeType === 'meetings' ? meetingCriteria : whatsappCriteria;
   const setCriteria = activeType === 'meetings' ? setMeetingCriteria : setWhatsappCriteria;
@@ -367,7 +394,7 @@ export default function AIConfigPage() {
     setCriteria(prev => prev.filter(c => c.id !== id));
   };
 
-  const handleSaveConfig = () => {
+  const handleSaveConfig = async () => {
     if (totalWeight !== 100) {
       toast({
         variant: 'destructive',
@@ -376,13 +403,20 @@ export default function AIConfigPage() {
       });
       return;
     }
-    // Persist to localStorage so other pages (WhatsApp analysis) can read
-    if (activeType === 'meetings') {
-      localStorage.setItem(AI_CONFIG_STORAGE.MEETINGS_CRITERIA, JSON.stringify(meetingCriteria));
-      localStorage.setItem(AI_CONFIG_STORAGE.MEETINGS_PROMPT, JSON.stringify(meetingPrompt));
-    } else {
-      localStorage.setItem(AI_CONFIG_STORAGE.WHATSAPP_CRITERIA, JSON.stringify(whatsappCriteria));
-      localStorage.setItem(AI_CONFIG_STORAGE.WHATSAPP_PROMPT, JSON.stringify(whatsappPrompt));
+    // Persist to DB
+    try {
+      if (activeType === 'meetings') {
+        await saveAIConfig('meetings', meetingCriteria, meetingPrompt);
+        // Also keep localStorage for backwards compat
+        localStorage.setItem(AI_CONFIG_STORAGE.MEETINGS_CRITERIA, JSON.stringify(meetingCriteria));
+        localStorage.setItem(AI_CONFIG_STORAGE.MEETINGS_PROMPT, JSON.stringify(meetingPrompt));
+      } else {
+        await saveAIConfig('whatsapp', whatsappCriteria, whatsappPrompt);
+        localStorage.setItem(AI_CONFIG_STORAGE.WHATSAPP_CRITERIA, JSON.stringify(whatsappCriteria));
+        localStorage.setItem(AI_CONFIG_STORAGE.WHATSAPP_PROMPT, JSON.stringify(whatsappPrompt));
+      }
+    } catch (e: any) {
+      console.warn('[ai-config] Falha ao salvar no banco:', e);
     }
     toast({
       title: 'Configuração salva!',
@@ -394,12 +428,10 @@ export default function AIConfigPage() {
   const [testResult, setTestResult] = useState<{ score: number; summary: string; breakdown: { label: string; score: number; feedback: string }[] } | null>(null);
 
   const handleTest = async () => {
-    const { tokens } = (() => {
-      try { return JSON.parse(localStorage.getItem('appmax_openai_tokens') || '{}'); } catch { return {}; }
-    })();
-    const token = activeType === 'meetings' ? tokens?.meetings : tokens?.whatsapp;
+    const token = activeType === 'meetings' ? tokens.meetings : tokens.whatsapp;
+    const model = activeType === 'meetings' ? (models.meetings || 'gpt-4o-mini') : (models.whatsapp || 'gpt-4o-mini');
     if (!token) {
-      toast({ variant: 'destructive', title: 'Token não configurado', description: 'Adicione o token OpenAI em Config. IA antes de testar.' });
+      toast({ variant: 'destructive', title: 'Token não configurado', description: 'Configure o token OpenAI no Admin antes de testar.' });
       return;
     }
     setTestLoading(true);
@@ -415,7 +447,7 @@ export default function AIConfigPage() {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: `Analise esta conversa de exemplo usando os critérios abaixo e retorne APENAS JSON:\n\nCritérios:\n${criteriaText}\n\nConversa:\n${sampleTranscript}\n\nJSON esperado:\n{"totalScore":<0-100>,"summary":"<2 frases>","breakdown":[{"label":"<critério>","score":<0-100>,"feedback":"<1 frase>"}]}` },
