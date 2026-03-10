@@ -27,9 +27,10 @@ import PerformancePage from "@/pages/PerformancePage";
 import MyProfilePage from "@/pages/MyProfilePage";
 import NotFound from "@/pages/NotFound";
 
+import { CONFIG } from '@/lib/config';
+
 // Publishable Google OAuth Client ID (safe to expose in frontend)
-export const GOOGLE_CLIENT_ID =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+export const GOOGLE_CLIENT_ID = CONFIG.GOOGLE_CLIENT_ID;
 
 const queryClient = new QueryClient();
 

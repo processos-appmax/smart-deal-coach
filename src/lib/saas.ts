@@ -1,7 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { UserRole } from '@/types';
+import { CONFIG } from '@/lib/config';
 
-const ALLOWED_DOMAIN = (import.meta.env.VITE_GOOGLE_ALLOWED_DOMAIN || 'appmax.com.br').trim().toLowerCase();
+const ALLOWED_DOMAIN = CONFIG.GOOGLE_ALLOWED_DOMAIN;
 let empresaIdCache: string | null = null;
 
 export function normalizeEmail(email: string): string {

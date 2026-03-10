@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
+import { CONFIG } from '@/lib/config';
 
 // ─── Module IDs (must match NAV_ITEMS paths) ─────────────────────────────────
 export type ModuleId =
@@ -84,11 +85,11 @@ interface AppConfigContextType {
 }
 
 const DEFAULT_TOKENS: OpenAITokens = {
-  meetings: import.meta.env.VITE_OPENAI_TOKEN_MEETINGS || '',
-  training: import.meta.env.VITE_OPENAI_TOKEN_TRAINING || '',
-  whatsapp: import.meta.env.VITE_OPENAI_TOKEN_WHATSAPP || '',
-  reports: import.meta.env.VITE_OPENAI_TOKEN_REPORTS || '',
-  automations: import.meta.env.VITE_OPENAI_TOKEN_AUTOMATIONS || '',
+  meetings: CONFIG.OPENAI_TOKEN_MEETINGS,
+  training: CONFIG.OPENAI_TOKEN_TRAINING,
+  whatsapp: CONFIG.OPENAI_TOKEN_WHATSAPP,
+  reports: CONFIG.OPENAI_TOKEN_REPORTS,
+  automations: CONFIG.OPENAI_TOKEN_AUTOMATIONS,
 };
 
 export const DEFAULT_MODULES: ModuleConfig[] = [

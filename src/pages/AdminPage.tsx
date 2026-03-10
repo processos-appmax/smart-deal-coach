@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { CONFIG } from '@/lib/config';
 import { MOCK_USERS, MOCK_TEAMS, MOCK_AREAS } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,11 +62,11 @@ function saveOAuthSetting(key: string, value: string) {
   void value;
 }
 function loadOAuthSetting(key: string): string {
-  if (key === GOOG_KEY) return import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  if (key === GOOG_KEY) return CONFIG.GOOGLE_CLIENT_ID;
   return '';
 }
 export function getStoredGoogleClientId(): string {
-  return import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  return CONFIG.GOOGLE_CLIENT_ID;
 }
 
 const TOKEN_FIELDS: { key: keyof import('@/contexts/AppConfigContext').OpenAITokens; label: string; desc: string; icon: string }[] = [
@@ -104,7 +105,7 @@ export default function AdminPage() {
   const [showOauthSecret, setShowOauthSecret] = useState(false);
   const [showOauthClientId, setShowOauthClientId] = useState(false);
   const APP_URL = window.location.origin;
-  const CALLBACK_URL = import.meta.env.VITE_GOOGLE_REDIRECT_URI || `${APP_URL}/auth/google/callback`;
+  const CALLBACK_URL = CONFIG.GOOGLE_REDIRECT_URI || `${APP_URL}/auth/google/callback`;
   // Audit logs state
   const [logs, setLogs] = useState<AuditEvent[]>([]);
   const [logSearch, setLogSearch] = useState('');

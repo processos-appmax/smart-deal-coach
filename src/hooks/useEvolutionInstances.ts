@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
+import { CONFIG } from '@/lib/config';
 
-const EVOLUTION_API_URL = import.meta.env.VITE_EVOLUTION_API_URL || '';
-const EVOLUTION_API_TOKEN = import.meta.env.VITE_EVOLUTION_API_TOKEN || '';
+const EVOLUTION_API_URL = CONFIG.EVOLUTION_API_URL;
+const EVOLUTION_API_TOKEN = CONFIG.EVOLUTION_API_TOKEN;
 
 export interface EvolutionInstance {
   id: string;

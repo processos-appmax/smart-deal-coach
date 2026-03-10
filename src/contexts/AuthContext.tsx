@@ -8,8 +8,9 @@ import {
   getAllowedUserByEmail,
   updateAllowedUserProfile,
 } from '@/lib/accessControl';
+import { CONFIG } from '@/lib/config';
 
-const ALLOWED_DOMAIN = (import.meta.env.VITE_GOOGLE_ALLOWED_DOMAIN || 'appmax.com.br').trim().toLowerCase();
+const ALLOWED_DOMAIN = CONFIG.GOOGLE_ALLOWED_DOMAIN;
 const SESSION_KEY = 'appmax_session';
 
 export function isAppmaxEmail(email: string): boolean {

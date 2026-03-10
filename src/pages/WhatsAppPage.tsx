@@ -21,8 +21,10 @@ import { MOCK_USERS, MOCK_TEAMS } from '@/data/mockData';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { AI_CONFIG_STORAGE, DEFAULT_WHATSAPP_CRITERIA } from '@/pages/AIConfigPage';
 
-const EVOLUTION_API_URL = import.meta.env.VITE_EVOLUTION_API_URL || '';
-const EVOLUTION_API_TOKEN = import.meta.env.VITE_EVOLUTION_API_TOKEN || '';
+import { CONFIG } from '@/lib/config';
+
+const EVOLUTION_API_URL = CONFIG.EVOLUTION_API_URL;
+const EVOLUTION_API_TOKEN = CONFIG.EVOLUTION_API_TOKEN;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Chat {

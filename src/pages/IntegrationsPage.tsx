@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useGoogleLogin } from '@react-oauth/google';
 import { getStoredGoogleClientId } from '@/pages/AdminPage';
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_ID = CONFIG.GOOGLE_CLIENT_ID;
 import {
   RefreshCw, Loader2, Smartphone, QrCode, MessageSquare,
   Phone, Wifi, WifiOff, X, CheckCircle2, XCircle,
@@ -19,10 +19,12 @@ import { loadAllowedUsers } from '@/lib/accessControl';
 import { supabase } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
 
+import { CONFIG } from '@/lib/config';
+
 // ─── Evolution API config ─────────────────────────────────────────────────────
-const EVOLUTION_API_URL = import.meta.env.VITE_EVOLUTION_API_URL || '';
-const EVOLUTION_API_TOKEN = import.meta.env.VITE_EVOLUTION_API_TOKEN || '';
-const ALLOWED_DOMAIN = (import.meta.env.VITE_GOOGLE_ALLOWED_DOMAIN || 'appmax.com.br').trim().toLowerCase();
+const EVOLUTION_API_URL = CONFIG.EVOLUTION_API_URL;
+const EVOLUTION_API_TOKEN = CONFIG.EVOLUTION_API_TOKEN;
+const ALLOWED_DOMAIN = CONFIG.GOOGLE_ALLOWED_DOMAIN;
 
 // ─── Google services config ───────────────────────────────────────────────────
 const GOOGLE_SERVICES = [

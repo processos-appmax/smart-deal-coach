@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { GOOGLE_CLIENT_ID } from '@/App';
+import { CONFIG } from '@/lib/config';
 import BrandLogo from '@/components/BrandLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +41,7 @@ export default function LoginPage() {
   const googleLogin = useGoogleLogin({
     flow: 'implicit',
     scope: 'openid email profile',
-    hosted_domain: (import.meta.env.VITE_GOOGLE_ALLOWED_DOMAIN || 'appmax.com.br').trim().toLowerCase(),
+    hosted_domain: CONFIG.GOOGLE_ALLOWED_DOMAIN,
     onSuccess: async (tokenResponse) => {
       try {
         const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
