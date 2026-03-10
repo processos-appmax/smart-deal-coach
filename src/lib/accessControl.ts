@@ -7,6 +7,16 @@ import {
   roleToDb,
 } from '@/lib/saas';
 
+// ─── Password hashing (SHA-256 via Web Crypto) ─────────────────────────────
+async function hashPassword(plain: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export const hashPasswordForLogin = hashPassword;
+
 export interface AllowedUser {
   email: string;
   name: string;
@@ -71,24 +81,49 @@ export async function upsertAllowedUser(user: AllowedUser): Promise<void> {
   const empresaId = await getSaasEmpresaId();
   const email = norm(user.email);
 
-  const payload: Record<string, any> = {
-    empresa_id: empresaId,
-    email,
-    nome: user.name,
-    papel: roleToDb(user.role),
-    status: 'ativo',
-  };
-
-  // Only update password/avatar if explicitly provided (avoid clearing on role-only updates)
-  if (user.password !== undefined) payload.senha_hash = user.password || null;
-  if (user.avatar !== undefined) payload.avatar_url = user.avatar || null;
-
-  const { error } = await supabase
+  // Check if user already exists
+  const { data: existing } = await supabase
     .schema('saas')
     .from('usuarios')
-    .upsert(payload, { onConflict: 'email' });
+    .select('id')
+    .eq('empresa_id', empresaId)
+    .eq('email', email)
+    .maybeSingle();
 
-  if (error) throw error;
+  if (existing) {
+    // UPDATE only the fields that were provided (never clear password/avatar)
+    const patch: Record<string, any> = {
+      nome: user.name,
+      papel: roleToDb(user.role),
+      status: 'ativo',
+    };
+    if (user.password) patch.senha_hash = await hashPassword(user.password);
+    if (user.avatar !== undefined) patch.avatar_url = user.avatar || null;
+
+    const { error } = await supabase
+      .schema('saas')
+      .from('usuarios')
+      .update(patch)
+      .eq('id', existing.id);
+
+    if (error) throw error;
+  } else {
+    // INSERT new user
+    const { error } = await supabase
+      .schema('saas')
+      .from('usuarios')
+      .insert({
+        empresa_id: empresaId,
+        email,
+        nome: user.name,
+        papel: roleToDb(user.role),
+        status: 'ativo',
+        senha_hash: user.password ? await hashPassword(user.password) : null,
+        avatar_url: user.avatar || null,
+      });
+
+    if (error) throw error;
+  }
 }
 
 export async function removeAllowedUser(email: string): Promise<boolean> {

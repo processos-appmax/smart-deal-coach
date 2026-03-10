@@ -7,6 +7,7 @@ import {
   createOrRefreshAccessRequest,
   getAllowedUserByEmail,
   updateAllowedUserProfile,
+  hashPasswordForLogin,
 } from '@/lib/accessControl';
 import { CONFIG } from '@/lib/config';
 
@@ -113,7 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Usuário não autorizado.');
       }
 
-      if (!allowedMatch.password || allowedMatch.password !== password) {
+      const hashedInput = await hashPasswordForLogin(password);
+      if (!allowedMatch.password || (allowedMatch.password !== hashedInput && allowedMatch.password !== password)) {
         throw new Error('Credenciais inválidas. Verifique seu e-mail e senha.');
       }
 
