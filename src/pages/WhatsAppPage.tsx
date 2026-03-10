@@ -8,7 +8,7 @@ import {
   Smartphone, RefreshCw, Plus, CheckCheck, Send,
   ArrowUpDown, ArrowDownAZ, SortAsc, SortDesc,
   Brain, Sparkles, AlertTriangle, ChevronRight, Star,
-  Paperclip, Mic, MicOff, Image as ImageIcon, FileText, Play, Download, MapPin, Volume2,
+  Paperclip, Mic, MicOff, Image as ImageIcon, FileText, Play, Download, MapPin, Volume2, Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -1051,6 +1051,7 @@ export default function WhatsAppPage() {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const cancelledRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1147,8 +1148,8 @@ export default function WhatsAppPage() {
     setSending(true);
     try {
       const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
@@ -1156,15 +1157,16 @@ export default function WhatsAppPage() {
       const isImage = file.type.startsWith('image/');
       const isVideo = file.type.startsWith('video/');
       const mediatype = isImage ? 'image' : isVideo ? 'video' : 'document';
+      const number = activeChat.phone || activeChat.remoteJid;
 
       await evoFetch(`/message/sendMedia/${activeInstance.name}`, {
         method: 'POST',
         body: JSON.stringify({
-          number: activeChat.phone || activeChat.remoteJid,
+          number,
           mediatype,
           mimetype: file.type,
           caption: '',
-          media: `data:${file.type};base64,${base64}`,
+          media: dataUrl,
           fileName: file.name,
         }),
       });
@@ -1196,23 +1198,30 @@ export default function WhatsAppPage() {
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
+        // Check if recording was cancelled
+        if (cancelledRef.current) {
+          cancelledRef.current = false;
+          return;
+        }
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         if (blob.size < 100) return; // Too short, ignore
 
         setSending(true);
         try {
           const reader = new FileReader();
-          const base64 = await new Promise<string>((resolve, reject) => {
-            reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           });
 
+          const number = activeChat!.phone || activeChat!.remoteJid;
+
           await evoFetch(`/message/sendWhatsAppAudio/${activeInstance!.name}`, {
             method: 'POST',
             body: JSON.stringify({
-              number: activeChat!.phone || activeChat!.remoteJid,
-              audio: `data:audio/ogg;base64,${base64}`,
+              number,
+              audio: dataUrl,
             }),
           });
           await loadMessages(activeInstance!.name, activeChat!, false);
@@ -1230,6 +1239,15 @@ export default function WhatsAppPage() {
   };
 
   const stopRecording = () => {
+    cancelledRef.current = false;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setRecording(false);
+  };
+
+  const cancelRecording = () => {
+    cancelledRef.current = true;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -1659,13 +1677,23 @@ export default function WhatsAppPage() {
                         {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                       </Button>
                     ) : recording ? (
-                      <Button
-                        size="sm"
-                        className="h-10 w-10 p-0 flex-shrink-0 bg-destructive hover:bg-destructive/90 animate-pulse"
-                        onClick={stopRecording}
-                        title="Parar gravação">
-                        <MicOff className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm" variant="ghost"
+                          className="h-10 w-10 p-0 flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={cancelRecording}
+                          title="Cancelar gravação">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                        <span className="text-xs text-destructive animate-pulse font-medium">Gravando...</span>
+                        <Button
+                          size="sm"
+                          className="h-10 w-10 p-0 flex-shrink-0 bg-success hover:bg-success/90"
+                          onClick={stopRecording}
+                          title="Enviar áudio">
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
                     ) : (
                       <Button
                         size="sm" variant="ghost"
