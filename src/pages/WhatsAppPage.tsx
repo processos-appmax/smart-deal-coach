@@ -440,7 +440,7 @@ Responda APENAS com JSON v√°lido no seguinte formato (sem markdown, sem explica√
 export default function WhatsAppPage() {
   const { user, hasRole } = useAuth();
   const { toast } = useToast();
-  const isAdmin = hasRole(['admin', 'director', 'supervisor']);
+  const isAdmin = hasRole(['admin', 'ceo', 'director', 'manager', 'coordinator', 'supervisor']);
   const { instances: evoInstances, loading: evoLoading, refetch: refetchEvo } = useEvolutionInstances();
   const { tokens } = useAppConfig();
 

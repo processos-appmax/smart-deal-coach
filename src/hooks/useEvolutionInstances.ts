@@ -81,13 +81,17 @@ export function useEvolutionInstances() {
     setLoading(true);
     setError(null);
     try {
-      // First: load from database so UI shows instantly
-      const dbInstances = await loadInstancesFromDb();
-      if (dbInstances.length > 0) {
-        setInstances(dbInstances);
+      // Try loading from database first (non-blocking)
+      try {
+        const dbInstances = await loadInstancesFromDb();
+        if (dbInstances.length > 0) {
+          setInstances(dbInstances);
+        }
+      } catch (dbErr) {
+        console.warn('[instances] Falha ao carregar do banco (ignorando):', dbErr);
       }
 
-      // Then: fetch live data from Evolution API and sync
+      // Always fetch live data from Evolution API
       if (EVOLUTION_API_URL && EVOLUTION_API_TOKEN) {
         const res = await window.fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
           headers: { apikey: EVOLUTION_API_TOKEN, 'Content-Type': 'application/json' },
@@ -97,10 +101,12 @@ export function useEvolutionInstances() {
           const apiInstances: EvolutionInstance[] = Array.isArray(apiData) ? apiData : [];
           setInstances(apiInstances);
           // Sync live data back to database in background
-          syncInstancesToDb(apiInstances);
+          syncInstancesToDb(apiInstances).catch(() => {});
+        } else {
+          throw new Error(`Evolution API HTTP ${res.status}`);
         }
-      } else if (dbInstances.length === 0) {
-        throw new Error('Evolution API não configurada e nenhuma instância encontrada no banco.');
+      } else {
+        throw new Error('Evolution API não configurada (VITE_EVOLUTION_API_URL ou VITE_EVOLUTION_API_TOKEN vazios).');
       }
     } catch (e: any) {
       setError(e.message);
