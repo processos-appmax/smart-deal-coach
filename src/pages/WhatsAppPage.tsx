@@ -467,7 +467,7 @@ export default function WhatsAppPage() {
 
   // Helper: find team for an instance by looking up the assigned user's teamId
   const getInstTeamId = (instName: string): string | null => {
-    const assignedUser = realUsers.find(u => getInstanceForUser(u.id) === instName);
+    const assignedUser = MOCK_USERS.find(u => getInstanceForUser(u.id) === instName);
     return assignedUser ? null : null;
   };
 
@@ -895,7 +895,7 @@ export default function WhatsAppPage() {
             {visibleInstances.map(inst => {
               const isOpen = inst.connectionStatus === 'open';
               const phone = inst.ownerJid?.replace('@s.whatsapp.net', '');
-              const assignedUser = realUsers.find(u => getInstanceForUser(u.id) === inst.name);
+              const assignedUser = MOCK_USERS.find(u => getInstanceForUser(u.id) === inst.name);
               const isActive = activeInstance?.name === inst.name;
               return (
                 <button
