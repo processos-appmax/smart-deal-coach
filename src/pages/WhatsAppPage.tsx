@@ -55,8 +55,8 @@ interface Message {
   thumbnailB64?: string;
   latitude?: number;
   longitude?: number;
-  // raw message key for getBase64 API
-  rawMsgKeyId?: string;
+  // raw message key object for getBase64 API
+  rawMsgKey?: { id: string; remoteJid: string; fromMe: boolean };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -465,16 +465,16 @@ function MessageContent({
 }: {
   msg: Message;
   instanceName: string;
-  fetchBase64: (inst: string, keyId: string, mp4?: boolean) => Promise<string | null>;
+  fetchBase64: (inst: string, key: { id: string; remoteJid: string; fromMe: boolean }, mp4?: boolean) => Promise<string | null>;
 }) {
   const [mediaData, setMediaData] = useState<string | null>(null);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const isFromMe = msg.fromMe;
 
   const loadMedia = async () => {
-    if (mediaData || loadingMedia || !msg.rawMsgKeyId) return;
+    if (mediaData || loadingMedia || !msg.rawMsgKey) return;
     setLoadingMedia(true);
-    const b64 = await fetchBase64(instanceName, msg.rawMsgKeyId, msg.type === 'video');
+    const b64 = await fetchBase64(instanceName, msg.rawMsgKey, msg.type === 'video');
     if (b64) {
       const mime = msg.mimetype || 'application/octet-stream';
       setMediaData(`data:${mime};base64,${b64}`);
@@ -485,7 +485,7 @@ function MessageContent({
   // Auto-load all media types via getBase64FromMediaMessage (Baileys URLs are encrypted)
   useEffect(() => {
     const mediaTypes: MsgType[] = ['audio', 'ptt', 'image', 'video', 'sticker', 'document'];
-    if (mediaTypes.includes(msg.type) && !mediaData && msg.rawMsgKeyId) {
+    if (mediaTypes.includes(msg.type) && !mediaData && msg.rawMsgKey) {
       loadMedia();
     }
   }, [msg.id]);
@@ -802,19 +802,26 @@ export default function WhatsAppPage() {
         msg.stickerMessage?.jpegThumbnail || undefined,
       latitude: msg.locationMessage?.degreesLatitude || msg.liveLocationMessage?.degreesLatitude,
       longitude: msg.locationMessage?.degreesLongitude || msg.liveLocationMessage?.degreesLongitude,
-      rawMsgKeyId: m.key?.id,
+      rawMsgKey: m.key ? { id: m.key.id, remoteJid: m.key.remoteJid, fromMe: m.key.fromMe === true } : undefined,
     };
   };
 
   /** Fetch base64 for a media message from Evolution API */
-  const fetchMediaBase64 = async (instanceName: string, msgKeyId: string, convertToMp4 = false): Promise<string | null> => {
+  const fetchMediaBase64 = async (
+    instanceName: string,
+    msgKey: { id: string; remoteJid: string; fromMe: boolean },
+    convertToMp4 = false,
+  ): Promise<string | null> => {
     try {
       const data = await evoFetch(`/chat/getBase64FromMediaMessage/${instanceName}`, {
         method: 'POST',
-        body: JSON.stringify({ message: { key: { id: msgKeyId } }, convertToMp4 }),
+        body: JSON.stringify({ message: { key: msgKey }, convertToMp4 }),
       });
       return data?.base64 || null;
-    } catch { return null; }
+    } catch (err) {
+      console.warn('[Media] Falha ao carregar base64:', msgKey.id, err);
+      return null;
+    }
   };
 
   // For @lid chats, the real phone number is in lastMessage.key.remoteJidAlt.
