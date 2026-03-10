@@ -77,12 +77,12 @@ export function getStoredGoogleClientId(): string {
   return CONFIG.GOOGLE_CLIENT_ID;
 }
 
-const TOKEN_FIELDS: { key: keyof import('@/contexts/AppConfigContext').OpenAITokens; label: string; desc: string; icon: string }[] = [
-  { key: 'meetings',    label: 'Token — Reuniões',                icon: '🎙️', desc: 'Análise e transcrição de reuniões gravadas' },
-  { key: 'training',    label: 'Token — Treinamentos (voz)',       icon: '🎓', desc: 'Simulação de voz em tempo real com a IA' },
-  { key: 'whatsapp',    label: 'Token — WhatsApp / Conversas',    icon: '💬', desc: 'Análise e sugestão nas conversas do WhatsApp' },
-  { key: 'reports',     label: 'Token — Relatórios & Insights',   icon: '📊', desc: 'Geração automática de relatórios com IA' },
-  { key: 'automations', label: 'Token — Automações',              icon: '⚡', desc: 'IA nos gatilhos e ações das automações' },
+const TOKEN_FIELDS: { key: keyof import('@/contexts/AppConfigContext').OpenAITokens; label: string; desc: string; icon: string; recommended: string }[] = [
+  { key: 'meetings',    label: 'Reuniões',                icon: '🎙️', desc: 'Análise e transcrição de reuniões gravadas', recommended: 'gpt-4o-mini' },
+  { key: 'training',    label: 'Treinamentos (voz)',       icon: '🎓', desc: 'Simulação de voz em tempo real com a IA', recommended: 'gpt-4o' },
+  { key: 'whatsapp',    label: 'WhatsApp / Conversas',    icon: '💬', desc: 'Análise e sugestão nas conversas do WhatsApp', recommended: 'gpt-4o-mini' },
+  { key: 'reports',     label: 'Relatórios & Insights',   icon: '📊', desc: 'Geração automática de relatórios com IA', recommended: 'gpt-4o-mini' },
+  { key: 'automations', label: 'Automações',              icon: '⚡', desc: 'IA nos gatilhos e ações das automações', recommended: 'gpt-4o-mini' },
 ];
 
 // Role color badge classes
@@ -806,6 +806,39 @@ export default function AdminPage() {
                           {testMsg}
                         </p>
                       )}
+                      {/* Model selector */}
+                      <div className="pt-1">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <p className="text-[11px] font-medium text-muted-foreground">Modelo:</p>
+                          {models[f.key] === f.recommended && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">Recomendado</span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          {AI_MODELS.map(m => {
+                            const selected = models[f.key] === m.id;
+                            const isRecommended = m.id === f.recommended;
+                            return (
+                              <button
+                                key={m.id}
+                                onClick={() => setModuleModel(f.key as ModuleAIKey, m.id)}
+                                className={cn(
+                                  'text-left px-2.5 py-1.5 rounded-lg border transition-all text-[11px]',
+                                  selected
+                                    ? 'bg-primary/15 border-primary/40 text-primary font-medium ring-1 ring-primary/20'
+                                    : 'border-border/50 text-muted-foreground hover:bg-muted/50 hover:border-border'
+                                )}
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">{m.label}</span>
+                                  {isRecommended && !selected && <span className="text-[8px] text-primary/60">*</span>}
+                                </div>
+                                <p className="text-[9px] text-muted-foreground/70 leading-tight mt-0.5">{m.badge}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
