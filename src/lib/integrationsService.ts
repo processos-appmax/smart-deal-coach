@@ -68,6 +68,26 @@ export async function upsertUserIntegration(
   }
 }
 
+// Delete integration records for a user (used on disconnect)
+export async function deleteUserIntegrations(
+  userEmail: string,
+  tipos: IntegrationType[],
+): Promise<void> {
+  const empresaId = await getSaasEmpresaId();
+  const usuarioId = await resolveUserUuid(userEmail);
+  if (!usuarioId) return;
+
+  for (const tipo of tipos) {
+    await (supabase as any)
+      .schema('saas')
+      .from('integracoes')
+      .delete()
+      .eq('empresa_id', empresaId)
+      .eq('usuario_id', usuarioId)
+      .eq('tipo', tipo);
+  }
+}
+
 // Load all integrations for all users in the company
 export async function loadAllUserIntegrations(): Promise<
   { email: string; tipo: string; status: string; nome: string; conectado_em?: string }[]

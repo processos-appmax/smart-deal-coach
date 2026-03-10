@@ -18,7 +18,7 @@ import { assignInstanceToUser, getInstanceForUserFromList, type EvolutionInstanc
 import { loadAllowedUsers } from '@/lib/accessControl';
 import { supabase } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
-import { upsertUserIntegration } from '@/lib/integrationsService';
+import { upsertUserIntegration, deleteUserIntegrations } from '@/lib/integrationsService';
 
 import { CONFIG } from '@/lib/config';
 
@@ -221,17 +221,23 @@ function GooglePanel() {
     googleLogin();
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
+    // Revoke the Google token if we have it
+    if (session?.accessToken) {
+      fetch(`https://oauth2.googleapis.com/revoke?token=${session.accessToken}`, {
+        method: 'POST',
+      }).catch(() => {});
+    }
+
     clearGoogleSession(userId);
     setSession(null);
 
-    // Persist to DB
+    // Delete integration records from DB (not just mark as desconectada)
     if (user?.email) {
-      upsertUserIntegration(user.email, 'google_calendar', '', 'desconectada').catch(() => {});
-      upsertUserIntegration(user.email, 'google_meet', '', 'desconectada').catch(() => {});
+      deleteUserIntegrations(user.email, ['google_calendar', 'google_meet']).catch(() => {});
     }
 
-    toast({ title: 'Google desconectado', description: 'Sua conta Google foi removida.' });
+    toast({ title: 'Google desconectado', description: 'Sua conta Google foi removida e dados de integração excluídos.' });
   };
 
   return (
