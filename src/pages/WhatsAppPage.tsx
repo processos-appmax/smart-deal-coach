@@ -1156,8 +1156,11 @@ export default function WhatsAppPage() {
 
       const isImage = file.type.startsWith('image/');
       const isVideo = file.type.startsWith('video/');
+      // Evolution API expects capitalized "Image" for images
       const mediatype = isImage ? 'image' : isVideo ? 'video' : 'document';
       const number = activeChat.phone || activeChat.remoteJid;
+      // Extract raw base64 from dataUrl
+      const base64 = dataUrl.split(',')[1];
 
       await evoFetch(`/message/sendMedia/${activeInstance.name}`, {
         method: 'POST',
@@ -1166,7 +1169,7 @@ export default function WhatsAppPage() {
           mediatype,
           mimetype: file.type,
           caption: '',
-          media: dataUrl,
+          media: base64,
           fileName: file.name,
         }),
       });
@@ -1216,12 +1219,14 @@ export default function WhatsAppPage() {
           });
 
           const number = activeChat!.phone || activeChat!.remoteJid;
+          // Extract raw base64 from dataUrl
+          const base64 = dataUrl.split(',')[1];
 
           await evoFetch(`/message/sendWhatsAppAudio/${activeInstance!.name}`, {
             method: 'POST',
             body: JSON.stringify({
               number,
-              audio: dataUrl,
+              audio: base64,
             }),
           });
           await loadMessages(activeInstance!.name, activeChat!, false);
