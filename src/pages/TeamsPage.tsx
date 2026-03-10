@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { MOCK_TEAMS, MOCK_USERS } from '@/data/mockData';
+import { useState, useEffect, useCallback } from 'react';
+import { MOCK_USERS } from '@/data/mockData';
 import type { Team } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,20 +7,24 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Plus, Users, Target, Trophy, ChevronRight, Pencil,
-  TrendingUp, Video, X, Check, UserPlus, Trash2
+  TrendingUp, Video, X, Check, UserPlus, Trash2, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { loadTeams, createTeam, updateTeam, deleteTeam } from '@/lib/teamsService';
+import { loadAllowedUsers, type AllowedUser } from '@/lib/accessControl';
 
 // ─── Create / Edit Team Modal ─────────────────────────────────────────────────
 function TeamModal({
   team,
+  users,
   onClose,
   onSave,
 }: {
   team?: Team;
+  users: AllowedUser[];
   onClose: () => void;
   onSave: (data: Partial<Team>) => void;
 }) {
@@ -30,8 +34,8 @@ function TeamModal({
   const [memberIds, setMemberIds] = useState<string[]>(team?.memberIds ?? []);
   const [goal, setGoal] = useState(String(team?.goal ?? 40));
 
-  const supervisors = MOCK_USERS.filter(u => ['admin', 'director', 'supervisor'].includes(u.role));
-  const availableMembers = MOCK_USERS.filter(u => u.role === 'member');
+  const supervisors = users.filter(u => ['admin', 'director', 'supervisor'].includes(u.role));
+  const availableMembers = users;
 
   const toggleMember = (id: string) =>
     setMemberIds(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
@@ -64,10 +68,10 @@ function TeamModal({
               </SelectTrigger>
               <SelectContent className="bg-card border-border">
                 {supervisors.map(u => (
-                  <SelectItem key={u.id} value={u.id} className="text-xs">
+                  <SelectItem key={`user_${u.email}`} value={`user_${u.email}`} className="text-xs">
                     <div className="flex items-center gap-2">
-                      <img src={u.avatar} alt={u.name} className="w-5 h-5 rounded-full" />
                       {u.name}
+                      <span className="text-muted-foreground">({u.role})</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -84,17 +88,20 @@ function TeamModal({
             </label>
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               {availableMembers.map(u => {
-                const selected = memberIds.includes(u.id);
+                const userId = `user_${u.email}`;
+                const selected = memberIds.includes(userId);
                 return (
                   <div
-                    key={u.id}
-                    onClick={() => toggleMember(u.id)}
+                    key={userId}
+                    onClick={() => toggleMember(userId)}
                     className={cn(
                       'flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-all',
                       selected ? 'bg-primary/8 border-primary/30' : 'border-border hover:bg-muted/40'
                     )}
                   >
-                    <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-full border border-border" />
+                    <div className="w-7 h-7 rounded-full bg-primary/15 text-primary font-bold flex items-center justify-center flex-shrink-0 text-xs">
+                      {u.name[0]?.toUpperCase() || '?'}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium">{u.name}</p>
                       <p className="text-[10px] text-muted-foreground">{u.email}</p>
@@ -106,6 +113,9 @@ function TeamModal({
                   </div>
                 );
               })}
+              {availableMembers.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-3">Nenhum usuário cadastrado.</p>
+              )}
             </div>
           </div>
           <div className="flex gap-2 pt-1">
@@ -153,47 +163,89 @@ const roleLabels: Record<string, string> = {
 
 export default function TeamsPage() {
   const { toast } = useToast();
-  const [teams, setTeams] = useState(MOCK_TEAMS);
-  const [selected, setSelected] = useState(MOCK_TEAMS[0]?.id ?? '');
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [users, setUsers] = useState<AllowedUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<Team | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Team | null>(null);
 
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [teamsData, usersData] = await Promise.all([loadTeams(), loadAllowedUsers()]);
+      setTeams(teamsData);
+      setUsers(usersData);
+      if (teamsData.length > 0 && !selected) setSelected(teamsData[0].id);
+    } catch (e: any) {
+      console.error('[teams] fetch error:', e);
+      toast({ variant: 'destructive', title: 'Erro ao carregar times', description: e.message });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
   const team = teams.find(t => t.id === selected) ?? null;
-  const supervisor = team ? MOCK_USERS.find(u => u.id === team.supervisorId) : null;
-  const members = team ? MOCK_USERS.filter(u => team.memberIds.includes(u.id)) : [];
+
+  // Find user info by id (format: user_email@...)
+  const findUser = (userId: string): AllowedUser | undefined => {
+    const email = userId.replace(/^(user_|google_)/, '');
+    return users.find(u => u.email === email);
+  };
 
   const teamStats = team ? [
-    { label: 'Reuniões',    value: selected === 'team_001' ? '32' : '25', icon: Video },
-    { label: 'Score Médio', value: selected === 'team_001' ? '79' : '73', icon: Trophy },
-    { label: 'Meta',        value: `${team?.goal ?? 0}`,                  icon: Target },
+    { label: 'Membros', value: String(team.memberIds.length), icon: Users },
+    { label: 'Meta', value: `${team.goal ?? 0}`, icon: Target },
   ] : [];
 
-  const handleCreate = (data: Partial<Team>) => {
-    const newTeam: Team = {
-      id: `team_${Date.now()}`,
-      name: data.name!,
-      supervisorId: data.supervisorId!,
-      memberIds: data.memberIds ?? [],
-      companyId: 'comp_001',
-      goal: data.goal,
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
-    setTeams(prev => [...prev, newTeam]);
-    setSelected(newTeam.id);
-    toast({ title: 'Time criado', description: `${newTeam.name} foi criado com sucesso.` });
+  const handleCreate = async (data: Partial<Team>) => {
+    try {
+      const newTeam = await createTeam(data);
+      setTeams(prev => [newTeam, ...prev]);
+      setSelected(newTeam.id);
+      toast({ title: 'Time criado', description: `${newTeam.name} foi criado com sucesso.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao criar time', description: e.message });
+    }
   };
 
-  const handleEdit = (data: Partial<Team>) => {
-    setTeams(prev => prev.map(t => t.id === editTarget!.id ? { ...t, ...data } : t));
-    toast({ title: 'Time atualizado', description: 'As alterações foram salvas.' });
+  const handleEdit = async (data: Partial<Team>) => {
+    if (!editTarget) return;
+    try {
+      await updateTeam(editTarget.id, data);
+      setTeams(prev => prev.map(t => t.id === editTarget.id ? { ...t, ...data } : t));
+      toast({ title: 'Time atualizado', description: 'As alterações foram salvas.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao atualizar', description: e.message });
+    }
   };
 
-  const handleDelete = () => {
-    setTeams(prev => prev.filter(t => t.id !== deleteTarget!.id));
-    if (selected === deleteTarget!.id) setSelected(teams.filter(t => t.id !== deleteTarget!.id)[0]?.id ?? '');
-    toast({ title: 'Time excluído', variant: 'destructive' });
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteTeam(deleteTarget.id);
+      setTeams(prev => prev.filter(t => t.id !== deleteTarget.id));
+      if (selected === deleteTarget.id) {
+        const remaining = teams.filter(t => t.id !== deleteTarget.id);
+        setSelected(remaining[0]?.id ?? '');
+      }
+      toast({ title: 'Time excluído', variant: 'destructive' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao excluir', description: e.message });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="page-container animate-fade-in flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <span className="ml-2 text-sm text-muted-foreground">Carregando times...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container animate-fade-in">
@@ -211,8 +263,8 @@ export default function TeamsPage() {
         {/* Teams List */}
         <div className="w-72 flex-shrink-0 space-y-3">
           {teams.map(t => {
-            const sup = MOCK_USERS.find(u => u.id === t.supervisorId);
-            const mbrs = MOCK_USERS.filter(u => t.memberIds.includes(u.id));
+            const sup = findUser(t.supervisorId);
+            const memberCount = t.memberIds.length;
             return (
               <div
                 key={t.id}
@@ -248,12 +300,8 @@ export default function TeamsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex -space-x-2">
-                    {mbrs.slice(0, 3).map(m => (
-                      <img key={m.id} src={m.avatar} alt={m.name} className="w-6 h-6 rounded-full border-2 border-card" />
-                    ))}
-                  </div>
-                  <span className="text-xs text-muted-foreground">{mbrs.length} membros</span>
+                  <span className="text-xs text-muted-foreground">{memberCount} membros</span>
+                  {t.goal && <span className="text-xs text-muted-foreground">· Meta: {t.goal}</span>}
                 </div>
               </div>
             );
@@ -261,7 +309,7 @@ export default function TeamsPage() {
           {teams.length === 0 && (
             <div className="glass-card p-5 text-center">
               <p className="text-sm font-medium mb-1">Nenhum time criado</p>
-              <p className="text-xs text-muted-foreground mb-3">Comece criando seu primeiro time real.</p>
+              <p className="text-xs text-muted-foreground mb-3">Comece criando seu primeiro time.</p>
               <Button size="sm" className="bg-gradient-primary text-xs h-8" onClick={() => setShowCreate(true)}>
                 <Plus className="w-3.5 h-3.5 mr-1.5" /> Criar Time
               </Button>
@@ -279,7 +327,7 @@ export default function TeamsPage() {
                   <Pencil className="w-3 h-3" /> Editar
                 </Button>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 {teamStats.map(s => (
                   <div key={s.label} className="text-center p-3 rounded-xl bg-muted/50">
                     <s.icon className="w-5 h-5 mx-auto mb-1 text-primary" />
@@ -290,17 +338,19 @@ export default function TeamsPage() {
               </div>
             </div>
 
-            {supervisor && (
+            {team.supervisorId && findUser(team.supervisorId) && (
               <div className="glass-card p-5">
                 <h3 className="section-title mb-4">Supervisor</h3>
                 <div className="flex items-center gap-3">
-                  <img src={supervisor.avatar} alt={supervisor.name} className="w-10 h-10 rounded-full border border-border" />
+                  <div className="w-10 h-10 rounded-full bg-primary/15 text-primary font-bold flex items-center justify-center text-sm">
+                    {findUser(team.supervisorId)!.name[0]?.toUpperCase()}
+                  </div>
                   <div>
-                    <p className="font-semibold">{supervisor.name}</p>
-                    <p className="text-xs text-muted-foreground">{supervisor.email}</p>
+                    <p className="font-semibold">{findUser(team.supervisorId)!.name}</p>
+                    <p className="text-xs text-muted-foreground">{findUser(team.supervisorId)!.email}</p>
                   </div>
                   <Badge className="ml-auto text-xs" style={{ background: 'hsl(var(--primary)/0.15)', color: 'hsl(var(--primary))', border: '1px solid hsl(var(--primary)/0.2)' }}>
-                    {roleLabels[supervisor.role]}
+                    {roleLabels[findUser(team.supervisorId)!.role] || findUser(team.supervisorId)!.role}
                   </Badge>
                 </div>
               </div>
@@ -308,36 +358,32 @@ export default function TeamsPage() {
 
             <div className="glass-card p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="section-title">Membros ({members.length})</h3>
+                <h3 className="section-title">Membros ({team.memberIds.length})</h3>
                 <Button size="sm" variant="outline" className="text-xs h-7 border-border gap-1" onClick={() => setEditTarget(team)}>
                   <UserPlus className="w-3 h-3" /> Gerenciar
                 </Button>
               </div>
               <div className="space-y-3">
-                {members.map((m, i) => (
-                  <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/60 transition-colors">
-                    <span className="text-sm font-bold text-muted-foreground w-5">{i + 1}</span>
-                    <img src={m.avatar} alt={m.name} className="w-8 h-8 rounded-full border border-border" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{m.name}</p>
-                      <p className="text-xs text-muted-foreground">{m.email}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right hidden sm:block">
-                        <p className="text-xs text-muted-foreground">Score</p>
-                        <div className="flex items-center gap-2">
-                          <Progress value={i === 0 ? 91 : i === 1 ? 87 : 72} className="w-16 h-1" />
-                          <span className="text-xs font-medium">{i === 0 ? 91 : i === 1 ? 87 : 72}</span>
-                        </div>
+                {team.memberIds.map((mId, i) => {
+                  const m = findUser(mId);
+                  if (!m) return null;
+                  return (
+                    <div key={mId} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/60 transition-colors">
+                      <span className="text-sm font-bold text-muted-foreground w-5">{i + 1}</span>
+                      <div className="w-8 h-8 rounded-full bg-primary/15 text-primary font-bold flex items-center justify-center text-xs flex-shrink-0">
+                        {m.name[0]?.toUpperCase()}
                       </div>
-                      <span className={cn('text-[10px] px-2 py-0.5 rounded-full border',
-                        m.status === 'active' ? 'bg-success/10 text-success border-success/20' : 'bg-muted text-muted-foreground border-border')}>
-                        {m.status === 'active' ? 'Ativo' : 'Inativo'}
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{m.name}</p>
+                        <p className="text-xs text-muted-foreground">{m.email}</p>
+                      </div>
+                      <Badge className="text-[10px]" style={{ background: 'hsl(var(--primary)/0.1)', color: 'hsl(var(--primary))', border: '1px solid hsl(var(--primary)/0.15)' }}>
+                        {roleLabels[m.role] || m.role}
+                      </Badge>
                     </div>
-                  </div>
-                ))}
-                {members.length === 0 && (
+                  );
+                })}
+                {team.memberIds.length === 0 && (
                   <p className="text-xs text-muted-foreground text-center py-4">Nenhum membro neste time. Clique em "Gerenciar" para adicionar.</p>
                 )}
               </div>
@@ -346,8 +392,8 @@ export default function TeamsPage() {
         )}
       </div>
 
-      {showCreate  && <TeamModal onClose={() => setShowCreate(false)} onSave={handleCreate} />}
-      {editTarget  && <TeamModal team={editTarget} onClose={() => setEditTarget(null)} onSave={handleEdit} />}
+      {showCreate && <TeamModal users={users} onClose={() => setShowCreate(false)} onSave={handleCreate} />}
+      {editTarget && <TeamModal team={editTarget} users={users} onClose={() => setEditTarget(null)} onSave={handleEdit} />}
       {deleteTarget && <DeleteTeamModal team={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} />}
     </div>
   );
