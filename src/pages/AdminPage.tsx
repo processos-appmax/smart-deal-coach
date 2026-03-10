@@ -699,25 +699,61 @@ export default function AdminPage() {
           {section === 'api-keys' && (
             <div className="glass-card p-6 space-y-5">
               <div>
-                <h2 className="font-display font-semibold text-lg">Configuração de IA via .env</h2>
+                <h2 className="font-display font-semibold text-lg">Tokens OpenAI</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Tokens sensíveis não são mais gerenciados no frontend. Configure tudo no arquivo <code>.env</code>.
+                  Configure os tokens de API da OpenAI para cada módulo. Os tokens são salvos de forma segura no banco de dados.
                 </p>
               </div>
-              <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-muted/30 border border-border/50 space-y-2">
-                  <p className="text-xs font-semibold">Variáveis esperadas:</p>
-                  <code className="block text-[11px] text-muted-foreground">VITE_OPENAI_TOKEN_MEETINGS</code>
-                  <code className="block text-[11px] text-muted-foreground">VITE_OPENAI_TOKEN_TRAINING</code>
-                  <code className="block text-[11px] text-muted-foreground">VITE_OPENAI_TOKEN_WHATSAPP</code>
-                  <code className="block text-[11px] text-muted-foreground">VITE_OPENAI_TOKEN_REPORTS</code>
-                  <code className="block text-[11px] text-muted-foreground">VITE_OPENAI_TOKEN_AUTOMATIONS</code>
-                </div>
-                <div className="p-3 rounded-lg bg-warning/5 border border-warning/20">
-                  <p className="text-xs text-muted-foreground">
-                    Em produção, use backend com segredo server-side. <code>VITE_*</code> é visível no bundle frontend.
-                  </p>
-                </div>
+              <div className="space-y-4">
+                {TOKEN_FIELDS.map(f => {
+                  const val = tokens[f.key] || '';
+                  const visible = showKey[f.key] ?? false;
+                  const masked = val ? `sk-proj***${val.slice(-6)}` : '';
+                  return (
+                    <div key={f.key} className="p-4 rounded-xl bg-muted/30 border border-border/50 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{f.icon}</span>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{f.label}</p>
+                          <p className="text-[11px] text-muted-foreground">{f.desc}</p>
+                        </div>
+                        {val && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20">
+                            Configurado
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type={visible ? 'text' : 'password'}
+                            value={val}
+                            onChange={e => setToken(f.key, e.target.value.trim())}
+                            placeholder="sk-proj-..."
+                            className="w-full text-xs px-3 py-2 rounded-lg bg-background border border-border focus:border-primary/50 focus:ring-1 focus:ring-primary/20 outline-none font-mono"
+                          />
+                          {val && !visible && (
+                            <span className="absolute right-10 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-mono pointer-events-none">
+                              {masked}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setShowKey(prev => ({ ...prev, [f.key]: !visible }))}
+                          className="p-2 rounded-lg border border-border hover:bg-muted transition-colors"
+                          title={visible ? 'Ocultar' : 'Mostrar'}
+                        >
+                          {visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <p className="text-xs text-muted-foreground">
+                  Os tokens são salvos automaticamente no banco de dados ao digitar. A chamada à OpenAI é feita via RPC server-side (sem exposição no browser).
+                </p>
               </div>
             </div>
           )}
