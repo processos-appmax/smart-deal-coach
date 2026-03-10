@@ -929,7 +929,7 @@ export default function WhatsAppPage() {
       const sorted = Array.from(phoneMap.values()).sort((a, b) => b.lastMessageTs - a.lastMessageTs);
 
       if (silent) {
-        // On silent poll: preserve unread badges until user opens the chat
+        // On silent poll: preserve unread badges until user reads/replies
         setChats(prev => {
           const prevMap = new Map(prev.map(c => [c.id, c]));
           return sorted.map(newChat => {
@@ -938,11 +938,17 @@ export default function WhatsAppPage() {
             const old = prevMap.get(newChat.id);
             if (!old) return newChat; // brand new chat, use API unread
 
-            // New message arrived from contact → increment local unread
-            if (newChat.lastMessageTs > old.lastMessageTs && !newChat.lastMessageFromMe) {
+            const isNewMsg = newChat.lastMessageTs > old.lastMessageTs;
+
+            // Someone replied from phone/app (fromMe) → conversation handled, clear badge
+            if (isNewMsg && newChat.lastMessageFromMe) {
+              return { ...newChat, unread: 0 };
+            }
+            // New message from contact → increment local unread
+            if (isNewMsg && !newChat.lastMessageFromMe) {
               return { ...newChat, unread: old.unread + 1 };
             }
-            // Never decrease unread from poll — only user click resets it
+            // No new message — never decrease unread, only user click resets it
             const bestUnread = Math.max(old.unread, newChat.unread);
             return { ...newChat, unread: bestUnread };
           });
