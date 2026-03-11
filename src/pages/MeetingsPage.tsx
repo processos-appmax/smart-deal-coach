@@ -443,8 +443,8 @@ export default function MeetingsPage() {
                             <div>
                               <p className="text-sm font-medium">{m.titulo}</p>
                               <p className="text-xs text-muted-foreground">{m.cliente_nome || '—'}</p>
-                              {m.meeting_code && (
-                                <p className="text-[10px] text-muted-foreground/60 font-mono">{m.meeting_code}</p>
+                              {(m.meeting_code || m.google_event_id) && (
+                                <p className="text-[10px] text-muted-foreground/60 font-mono">{m.meeting_code || m.google_event_id}</p>
                               )}
                             </div>
                           </div>
@@ -638,10 +638,16 @@ export default function MeetingsPage() {
                         </span>
                       </div>
                     )}
-                    {selectedMeeting.meeting_code && (
+                    {(transcriptInfo?.meeting_code || selectedMeeting.meeting_code) && (
                       <div className="flex items-center gap-2 text-xs">
                         <span className="text-muted-foreground">Meeting code:</span>
-                        <span className="font-mono text-[10px]">{selectedMeeting.meeting_code}</span>
+                        <span className="font-mono text-[10px]">{transcriptInfo?.meeting_code || selectedMeeting.meeting_code}</span>
+                      </div>
+                    )}
+                    {selectedMeeting.google_event_id && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Conference key:</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">{selectedMeeting.google_event_id}</span>
                       </div>
                     )}
 

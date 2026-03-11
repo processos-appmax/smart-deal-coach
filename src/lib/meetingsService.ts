@@ -31,6 +31,7 @@ export interface TranscriptInfo {
   transcript_source_file_id?: string;
   transcript_copied_file_id?: string;
   transcript_text?: string;
+  meeting_code?: string;
   status?: string;
 }
 
