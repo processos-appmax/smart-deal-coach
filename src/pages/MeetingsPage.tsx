@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { useToast } from '@/hooks/use-toast';
 import {
-  loadMeetingsFromDb, syncMeetConferences, fetchTranscriptionsForAll, pullTranscriptions,
+  loadMeetingsFromDb, syncMeetConferences, clearAllMeetings, fetchTranscriptionsForAll, pullTranscriptions,
   ensureAppmaxParticipantsRegistered,
   type DbMeeting
 } from '@/lib/meetingsService';
@@ -120,9 +120,14 @@ export default function MeetingsPage() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      // Step 1: Import new meetings from meet_conferences (call_interna=false only)
+      // Step 1: Clear all existing meetings and AI analyses
+      setSyncProgress({ current: 0, total: 0, phase: 'Limpando reuniões...' });
+      toast({ title: 'Limpando...', description: 'Removendo reuniões antigas.' });
+      await clearAllMeetings();
+
+      // Step 2: Re-import from meet_conferences (call_interna=false only)
       setSyncProgress({ current: 0, total: 0, phase: 'Importando reuniões...' });
-      toast({ title: 'Sincronizando...', description: 'Buscando novas reuniões do Google Meet.' });
+      toast({ title: 'Importando...', description: 'Buscando reuniões do Google Meet.' });
       const syncResult = await syncMeetConferences();
 
       // Step 2: Reload to get fresh list with google_event_ids
