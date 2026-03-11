@@ -80,24 +80,20 @@ export async function clearAllMeetings(): Promise<void> {
 
 /**
  * Trigger the transcription fetcher API for a single conference_key.
- * Sends as form-urlencoded (same format as n8n HTTP Request node).
+ * Fire-and-forget: dispatches the POST but does NOT wait for the response.
+ * The API processes asynchronously and updates meet_conferences when done.
  */
-export async function triggerTranscriptionForKey(conferenceKey: string): Promise<void> {
+export function triggerTranscriptionForKey(conferenceKey: string): void {
   const body = new URLSearchParams();
   body.append('conference_key', conferenceKey);
 
-  const res = await fetch(TRANSCRIPT_API_URL, {
+  fetch(TRANSCRIPT_API_URL, {
     method: 'POST',
     headers: {
       'x-webhook-token': TRANSCRIPT_API_TOKEN,
     },
     body,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Transcription API error ${res.status}: ${text}`);
-  }
+  }).catch(e => console.warn(`[meetings] POST failed for ${conferenceKey}:`, e));
 }
 
 /**
@@ -150,17 +146,12 @@ export async function fetchTranscriptionsForAll(
 
   if (newMeetings.length === 0) return { triggered: 0, failed: 0, skipped };
 
-  // Step 2: Fire all POST requests in parallel (fire-and-forget style)
-  const postResults = await Promise.allSettled(
-    newMeetings.map(key => triggerTranscriptionForKey(key))
-  );
-
-  let triggered = 0;
-  let failed = 0;
-  for (const r of postResults) {
-    if (r.status === 'fulfilled') triggered++;
-    else { failed++; console.warn('[meetings] POST failed:', r.reason); }
+  // Step 2: Fire all POST requests (fire-and-forget, no await)
+  for (const key of newMeetings) {
+    triggerTranscriptionForKey(key);
   }
+  const triggered = newMeetings.length;
+  const failed = 0;
 
   return { triggered, failed, skipped };
 }
