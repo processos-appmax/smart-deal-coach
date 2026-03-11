@@ -143,61 +143,68 @@ export async function fetchTranscriptInfo(conferenceKey: string): Promise<Transc
 export async function fetchTranscriptionsForAll(
   meetings: DbMeeting[],
   onProgress?: (current: number, total: number, key?: string) => void,
-): Promise<{ triggered: number; failed: number; skipped: number }> {
+): Promise<{ triggered: number; failed: number; skipped: number; noTranscript: number; errors: string[] }> {
   const withKey = meetings.filter(m => m.google_event_id);
-  if (withKey.length === 0) return { triggered: 0, failed: 0, skipped: 0 };
+  if (withKey.length === 0) return { triggered: 0, failed: 0, skipped: 0, noTranscript: 0, errors: [] };
 
   // Step 1: Check transcript_copied_file_id of all meetings in parallel
   onProgress?.(0, withKey.length, 'Verificando...');
+  console.log(`[meetings] Checking ${withKey.length} meetings for transcript_copied_file_id...`);
   const statusResults = await Promise.allSettled(
     withKey.map(m => fetchTranscriptInfo(m.google_event_id!))
   );
 
   // Filter: only process meetings WITHOUT transcript_copied_file_id
-  const toProccess: string[] = [];
+  const toProcess: string[] = [];
   let skipped = 0;
   for (let i = 0; i < withKey.length; i++) {
     const result = statusResults[i];
     if (result.status === 'fulfilled') {
       const info = result.value;
+      console.log(`[meetings] ${withKey[i].google_event_id}: status=${info.status}, file_id=${info.transcript_copied_file_id || 'EMPTY'}`);
       if (info.transcript_copied_file_id) {
-        // Already has file — skip
         skipped++;
       } else {
-        toProccess.push(withKey[i].google_event_id!);
+        toProcess.push(withKey[i].google_event_id!);
       }
     } else {
-      // RPC failed — try to process anyway
-      toProccess.push(withKey[i].google_event_id!);
+      console.error(`[meetings] RPC failed for ${withKey[i].google_event_id}:`, result.reason);
+      toProcess.push(withKey[i].google_event_id!);
     }
   }
 
-  if (toProccess.length === 0) return { triggered: 0, failed: 0, skipped };
+  console.log(`[meetings] To process: ${toProcess.length}, Skipped (already have file): ${skipped}`);
+
+  if (toProcess.length === 0) return { triggered: 0, failed: 0, skipped, noTranscript: 0, errors: [] };
 
   // Step 2: Process one by one, waiting for each webhook response
   let triggered = 0;
   let failed = 0;
   let noTranscript = 0;
-  for (let i = 0; i < toProccess.length; i++) {
-    const key = toProccess[i];
-    onProgress?.(i + 1, toProccess.length, key);
+  const errors: string[] = [];
+  for (let i = 0; i < toProcess.length; i++) {
+    const key = toProcess[i];
+    onProgress?.(i + 1, toProcess.length, key);
+    console.log(`[meetings] POST ${i + 1}/${toProcess.length}: ${key}...`);
     try {
       const result = await triggerTranscriptionForKey(key);
       if (result?.ok && result.transcript_copied_file_id) {
-        console.log(`[meetings] TRANSCRIPT_DONE for ${key}: ${result.transcript_copied_file_id}`);
+        console.log(`[meetings] ✓ TRANSCRIPT_DONE for ${key}: ${result.transcript_copied_file_id}`);
         triggered++;
       } else {
-        // 404 or no transcription — not an error, just no transcript available
-        console.log(`[meetings] No transcript available for ${key}`);
+        console.log(`[meetings] ✗ No transcript for ${key} (404 or ERROR)`);
         noTranscript++;
       }
-    } catch (e) {
-      console.warn(`[meetings] Failed to process ${key}:`, e);
+    } catch (e: any) {
+      const errMsg = e?.message || String(e);
+      console.error(`[meetings] ✗ FAILED ${key}: ${errMsg}`);
+      errors.push(`${key}: ${errMsg}`);
       failed++;
     }
   }
 
-  return { triggered, failed, skipped };
+  console.log(`[meetings] Done: ${triggered} ok, ${noTranscript} sem transcrição, ${failed} erros`);
+  return { triggered, failed, skipped, noTranscript, errors };
 }
 
 /**

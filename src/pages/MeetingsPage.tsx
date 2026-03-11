@@ -148,7 +148,10 @@ export default function MeetingsPage() {
       const fetchResult = await fetchTranscriptionsForAll(freshMeetings, (current, total, key) => {
         setSyncProgress({ current, total, phase: `Processando transcrição ${current}/${total}...` });
       });
-      console.log(`[meetings] Transcription: ${fetchResult.triggered} processed, ${fetchResult.skipped} skipped, ${fetchResult.failed} failed`);
+      console.log(`[meetings] Transcription: triggered=${fetchResult.triggered}, skipped=${fetchResult.skipped}, noTranscript=${fetchResult.noTranscript}, failed=${fetchResult.failed}`);
+      if (fetchResult.errors.length > 0) {
+        console.error('[meetings] Errors:', fetchResult.errors);
+      }
 
       // Step 4: Pull transcript_text from meet_conferences into reunioes
       setSyncProgress({ current: 0, total: 0, phase: 'Importando transcrições...' });
@@ -157,10 +160,27 @@ export default function MeetingsPage() {
       // Final reload
       await loadMeetings();
 
+      const parts = [`${syncResult.inserted} novas, ${syncResult.updated} atualizadas`];
+      if (fetchResult.triggered > 0) parts.push(`${fetchResult.triggered} transcrições processadas`);
+      if (fetchResult.noTranscript > 0) parts.push(`${fetchResult.noTranscript} sem transcrição`);
+      if (fetchResult.failed > 0) parts.push(`${fetchResult.failed} com erro`);
+      if (fetchResult.skipped > 0) parts.push(`${fetchResult.skipped} já processadas`);
+      if (transcriptCount > 0) parts.push(`${transcriptCount} transcrições importadas`);
+
       toast({
-        title: 'Sincronização concluída',
-        description: `${syncResult.inserted} novas, ${syncResult.updated} atualizadas. ${fetchResult.triggered} processadas, ${transcriptCount} transcrições importadas.`,
+        title: fetchResult.failed > 0 ? 'Sincronização com erros' : 'Sincronização concluída',
+        variant: fetchResult.failed > 0 ? 'destructive' : 'default',
+        description: parts.join('. ') + '.',
       });
+
+      // Show first error in separate toast if any
+      if (fetchResult.errors.length > 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro na transcrição',
+          description: fetchResult.errors[0],
+        });
+      }
     } catch (err: any) {
       console.error('[meetings] Sync error:', err);
       toast({ variant: 'destructive', title: 'Erro na sincronização', description: err.message });
