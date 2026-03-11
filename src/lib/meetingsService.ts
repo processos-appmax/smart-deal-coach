@@ -80,9 +80,15 @@ export async function clearAllMeetings(): Promise<void> {
 
 /**
  * Trigger the transcription API for a single conference_key.
- * Waits for the response — the API processes and returns the result.
+ * Returns the result on 200 (with transcript_copied_file_id).
+ * Returns null on 404 (no transcription found / ERROR status).
  */
-export async function triggerTranscriptionForKey(conferenceKey: string): Promise<any> {
+export async function triggerTranscriptionForKey(conferenceKey: string): Promise<{
+  ok: boolean;
+  conference_key: string;
+  status: string;
+  transcript_copied_file_id?: string;
+} | null> {
   const body = new URLSearchParams();
   body.append('conference_key', conferenceKey);
 
@@ -94,16 +100,29 @@ export async function triggerTranscriptionForKey(conferenceKey: string): Promise
     body,
   });
 
+  if (res.status === 404) {
+    // No transcription found — meeting has ERROR status, skip
+    console.log(`[meetings] No transcription for ${conferenceKey} (404)`);
+    return null;
+  }
+
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Transcription API error ${res.status}: ${text}`);
   }
 
-  try {
-    return await res.json();
-  } catch {
-    return await res.text();
+  // 200 response: array with result e.g. [{ ok: true, result: { ... } }]
+  const json = await res.json();
+  const item = Array.isArray(json) ? json[0] : json;
+  if (item?.ok && item?.result) {
+    return {
+      ok: true,
+      conference_key: item.result.conference_key,
+      status: item.result.status,
+      transcript_copied_file_id: item.result.transcript_copied_file_id,
+    };
   }
+  return null;
 }
 
 /**
@@ -155,16 +174,23 @@ export async function fetchTranscriptionsForAll(
 
   if (toProccess.length === 0) return { triggered: 0, failed: 0, skipped };
 
-  // Step 2: Process one by one, waiting for each response
+  // Step 2: Process one by one, waiting for each webhook response
   let triggered = 0;
   let failed = 0;
+  let noTranscript = 0;
   for (let i = 0; i < toProccess.length; i++) {
     const key = toProccess[i];
     onProgress?.(i + 1, toProccess.length, key);
     try {
       const result = await triggerTranscriptionForKey(key);
-      console.log(`[meetings] Processed ${key}:`, result);
-      triggered++;
+      if (result?.ok && result.transcript_copied_file_id) {
+        console.log(`[meetings] TRANSCRIPT_DONE for ${key}: ${result.transcript_copied_file_id}`);
+        triggered++;
+      } else {
+        // 404 or no transcription — not an error, just no transcript available
+        console.log(`[meetings] No transcript available for ${key}`);
+        noTranscript++;
+      }
     } catch (e) {
       console.warn(`[meetings] Failed to process ${key}:`, e);
       failed++;
