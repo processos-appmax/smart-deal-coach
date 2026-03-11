@@ -109,31 +109,33 @@ export async function fetchTranscriptInfo(conferenceKey: string): Promise<Transc
 }
 
 /**
- * Fetch transcriptions for meetings with status "NEW" only.
- * Checks meet_conferences status via RPC before calling the API.
+ * Process meetings with status "NEW" in appmax.meet_conferences.
+ * For each meeting, checks the status via RPC. If NEW, calls the transcription API.
+ * This ensures documents are processed before pulling transcriptions.
  */
 export async function fetchTranscriptionsForAll(
   meetings: DbMeeting[],
   onProgress?: (current: number, total: number) => void,
 ): Promise<{ triggered: number; failed: number; skipped: number }> {
-  const pending = meetings.filter(m => m.google_event_id && !m.transcricao);
+  // Check ALL meetings with a conference_key (not just those without local transcription)
+  const withKey = meetings.filter(m => m.google_event_id);
   let triggered = 0;
   let failed = 0;
   let skipped = 0;
 
-  for (let i = 0; i < pending.length; i++) {
-    onProgress?.(i + 1, pending.length);
+  for (let i = 0; i < withKey.length; i++) {
+    onProgress?.(i + 1, withKey.length);
     try {
       // Check status in meet_conferences — only call API for NEW
-      const info = await fetchTranscriptInfo(pending[i].google_event_id!);
+      const info = await fetchTranscriptInfo(withKey[i].google_event_id!);
       if (info.status && info.status.toLowerCase() !== 'new') {
         skipped++;
         continue;
       }
-      await triggerTranscriptionForKey(pending[i].google_event_id!);
+      await triggerTranscriptionForKey(withKey[i].google_event_id!);
       triggered++;
     } catch (e) {
-      console.warn(`[meetings] Transcription fetch failed for ${pending[i].google_event_id}:`, e);
+      console.warn(`[meetings] Transcription fetch failed for ${withKey[i].google_event_id}:`, e);
       failed++;
     }
   }

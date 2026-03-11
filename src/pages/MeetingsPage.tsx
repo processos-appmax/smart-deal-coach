@@ -142,37 +142,31 @@ export default function MeetingsPage() {
       const freshMeetings = await loadMeetingsFromDb();
       setMeetings(freshMeetings);
 
-      // Step 3: Fetch transcriptions per conference_key (only for meetings without transcription)
-      const pendingCount = freshMeetings.filter(m => m.google_event_id && !m.transcricao).length;
-      if (pendingCount > 0) {
-        setSyncProgress({ current: 0, total: pendingCount, phase: 'Buscando transcrições...' });
-        toast({ title: 'Buscando transcrições...', description: `${pendingCount} reuniões para processar.` });
-        const fetchResult = await fetchTranscriptionsForAll(freshMeetings, (current, total) => {
-          setSyncProgress({ current, total, phase: 'Buscando transcrições...' });
-        });
-        console.log(`[meetings] Transcription fetch: ${fetchResult.triggered} triggered, ${fetchResult.failed} failed`);
+      // Step 3: Process all meetings with status NEW in meet_conferences
+      const withKeyCount = freshMeetings.filter(m => m.google_event_id).length;
+      setSyncProgress({ current: 0, total: withKeyCount, phase: 'Processando documentos (status NEW)...' });
+      toast({ title: 'Processando...', description: `Verificando ${withKeyCount} reuniões no meet_conferences.` });
+      const fetchResult = await fetchTranscriptionsForAll(freshMeetings, (current, total) => {
+        setSyncProgress({ current, total, phase: 'Processando documentos (status NEW)...' });
+      });
+      console.log(`[meetings] Transcription fetch: ${fetchResult.triggered} triggered, ${fetchResult.skipped} skipped, ${fetchResult.failed} failed`);
 
-        // Step 4: Wait for API to process, then pull transcript_text
+      // Step 4: Wait for API to process, then pull transcript_text
+      if (fetchResult.triggered > 0) {
         setSyncProgress({ current: 0, total: 0, phase: 'Aguardando processamento...' });
-        await new Promise(r => setTimeout(r, 3000));
-
-        setSyncProgress({ current: 0, total: 0, phase: 'Importando transcrições...' });
-        const transcriptCount = await pullTranscriptions();
-
-        // Final reload
-        await loadMeetings();
-
-        toast({
-          title: 'Sincronização concluída',
-          description: `${syncResult.inserted} novas, ${syncResult.updated} atualizadas, ${transcriptCount} transcrições importadas.`,
-        });
-      } else {
-        await loadMeetings();
-        toast({
-          title: 'Sincronização concluída',
-          description: `${syncResult.inserted} novas, ${syncResult.updated} atualizadas. Nenhuma transcrição pendente.`,
-        });
+        await new Promise(r => setTimeout(r, 5000));
       }
+
+      setSyncProgress({ current: 0, total: 0, phase: 'Importando transcrições...' });
+      const transcriptCount = await pullTranscriptions();
+
+      // Final reload
+      await loadMeetings();
+
+      toast({
+        title: 'Sincronização concluída',
+        description: `${syncResult.inserted} novas, ${syncResult.updated} atualizadas. ${fetchResult.triggered} processadas, ${transcriptCount} transcrições importadas.`,
+      });
     } catch (err: any) {
       console.error('[meetings] Sync error:', err);
       toast({ variant: 'destructive', title: 'Erro na sincronização', description: err.message });
