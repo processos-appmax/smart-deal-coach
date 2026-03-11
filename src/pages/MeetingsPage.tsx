@@ -13,8 +13,8 @@ import { useAppConfig } from '@/contexts/AppConfigContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   loadMeetingsFromDb, syncMeetConferences, clearAllMeetings, fetchTranscriptionsForAll, pullTranscriptions,
-  ensureAppmaxParticipantsRegistered,
-  type DbMeeting
+  ensureAppmaxParticipantsRegistered, fetchTranscriptInfo,
+  type DbMeeting, type TranscriptInfo
 } from '@/lib/meetingsService';
 import { evaluateMeeting, loadEvaluationByEntity, type StoredEvaluation } from '@/lib/evaluationService';
 import { loadAgentTree } from '@/lib/agentService';
@@ -86,6 +86,7 @@ export default function MeetingsPage() {
   const [detailTab, setDetailTab] = useState<'info' | 'transcript' | 'participants'>('info');
   const [meetingEval, setMeetingEval] = useState<(StoredEvaluation & { payload?: any }) | null>(null);
   const [reEvaluating, setReEvaluating] = useState(false);
+  const [transcriptInfo, setTranscriptInfo] = useState<TranscriptInfo | null>(null);
 
   const loadMeetings = useCallback(async () => {
     try {
@@ -114,6 +115,18 @@ export default function MeetingsPage() {
       setMeetingEval(null);
     }
   }, [selectedMeeting?.id, selectedMeeting?.analisada_por_ia]);
+
+  // Load transcript info from meet_conferences when meeting is selected
+  useEffect(() => {
+    if (selectedMeeting?.google_event_id) {
+      setTranscriptInfo(null);
+      fetchTranscriptInfo(selectedMeeting.google_event_id)
+        .then(setTranscriptInfo)
+        .catch(() => setTranscriptInfo(null));
+    } else {
+      setTranscriptInfo(null);
+    }
+  }, [selectedMeeting?.id, selectedMeeting?.google_event_id]);
 
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, phase: '' });
 
@@ -430,6 +443,9 @@ export default function MeetingsPage() {
                             <div>
                               <p className="text-sm font-medium">{m.titulo}</p>
                               <p className="text-xs text-muted-foreground">{m.cliente_nome || '—'}</p>
+                              {m.meeting_code && (
+                                <p className="text-[10px] text-muted-foreground/60 font-mono">{m.meeting_code}</p>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -606,6 +622,28 @@ export default function MeetingsPage() {
                         {selectedMeeting.transcricao ? 'Disponível' : 'Não disponível'}
                       </span>
                     </div>
+                    {transcriptInfo?.transcript_copied_file_id && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">File ID:</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">{transcriptInfo.transcript_copied_file_id}</span>
+                      </div>
+                    )}
+                    {transcriptInfo?.status && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className={cn('font-medium text-[10px] px-2 py-0.5 rounded-full',
+                          transcriptInfo.status.toLowerCase() === 'new' ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'
+                        )}>
+                          {transcriptInfo.status}
+                        </span>
+                      </div>
+                    )}
+                    {selectedMeeting.meeting_code && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Meeting code:</span>
+                        <span className="font-mono text-[10px]">{selectedMeeting.meeting_code}</span>
+                      </div>
+                    )}
 
                     {/* AI Evaluation results */}
                     {selectedMeeting.analisada_por_ia && meetingEval && (

@@ -24,6 +24,14 @@ export interface DbMeeting {
   google_event_id?: string;
   transcript_file_id?: string | null;
   sentimento?: string | null;
+  meeting_code?: string | null;
+}
+
+export interface TranscriptInfo {
+  transcript_source_file_id?: string;
+  transcript_copied_file_id?: string;
+  transcript_text?: string;
+  status?: string;
 }
 
 // ─── Transcription API config ────────────────────────────────────────────────
@@ -90,20 +98,37 @@ export async function triggerTranscriptionForKey(conferenceKey: string): Promise
 }
 
 /**
- * Fetch transcriptions for all meetings by calling the API per conference_key.
- * Returns the number of successfully triggered requests.
+ * Fetch transcript info from appmax.meet_conferences via RPC.
+ */
+export async function fetchTranscriptInfo(conferenceKey: string): Promise<TranscriptInfo> {
+  const { data } = await (supabase as any)
+    .schema('saas')
+    .rpc('buscar_transcript_file', { p_conference_key: conferenceKey });
+  return (data as TranscriptInfo) || {};
+}
+
+/**
+ * Fetch transcriptions for meetings with status "NEW" only.
+ * Checks meet_conferences status via RPC before calling the API.
  */
 export async function fetchTranscriptionsForAll(
   meetings: DbMeeting[],
   onProgress?: (current: number, total: number) => void,
-): Promise<{ triggered: number; failed: number }> {
+): Promise<{ triggered: number; failed: number; skipped: number }> {
   const pending = meetings.filter(m => m.google_event_id && !m.transcricao);
   let triggered = 0;
   let failed = 0;
+  let skipped = 0;
 
   for (let i = 0; i < pending.length; i++) {
     onProgress?.(i + 1, pending.length);
     try {
+      // Check status in meet_conferences — only call API for NEW
+      const info = await fetchTranscriptInfo(pending[i].google_event_id!);
+      if (info.status && info.status.toLowerCase() !== 'new') {
+        skipped++;
+        continue;
+      }
       await triggerTranscriptionForKey(pending[i].google_event_id!);
       triggered++;
     } catch (e) {
@@ -112,7 +137,7 @@ export async function fetchTranscriptionsForAll(
     }
   }
 
-  return { triggered, failed };
+  return { triggered, failed, skipped };
 }
 
 /**
@@ -213,6 +238,7 @@ export async function loadMeetingsFromDb(): Promise<DbMeeting[]> {
     vendedor_email: vendedorMap[r.vendedor_id]?.email,
     google_event_id: r.google_event_id,
     sentimento: r.sentimento || null,
+    meeting_code: r.link_meet ? r.link_meet.replace('https://meet.google.com/', '') : null,
   }));
 }
 
