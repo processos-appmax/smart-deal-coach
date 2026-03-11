@@ -110,34 +110,54 @@ export async function fetchTranscriptInfo(conferenceKey: string): Promise<Transc
 
 /**
  * Process meetings with status "NEW" in appmax.meet_conferences.
- * For each meeting, checks the status via RPC. If NEW, calls the transcription API.
- * This ensures documents are processed before pulling transcriptions.
+ * 1. Check status of all meetings via RPC (parallel, batched)
+ * 2. Fire POST to transcription API for all NEW ones in parallel (don't wait for processing)
  */
 export async function fetchTranscriptionsForAll(
   meetings: DbMeeting[],
   onProgress?: (current: number, total: number) => void,
 ): Promise<{ triggered: number; failed: number; skipped: number }> {
-  // Check ALL meetings with a conference_key (not just those without local transcription)
   const withKey = meetings.filter(m => m.google_event_id);
+  if (withKey.length === 0) return { triggered: 0, failed: 0, skipped: 0 };
+
+  // Step 1: Check status of all meetings in parallel
+  onProgress?.(0, withKey.length);
+  const statusResults = await Promise.allSettled(
+    withKey.map(m => fetchTranscriptInfo(m.google_event_id!))
+  );
+
+  // Filter only NEW ones
+  const newMeetings: string[] = [];
+  let skipped = 0;
+  for (let i = 0; i < withKey.length; i++) {
+    const result = statusResults[i];
+    if (result.status === 'fulfilled') {
+      const info = result.value;
+      if (!info.status || info.status.toLowerCase() === 'new') {
+        newMeetings.push(withKey[i].google_event_id!);
+      } else {
+        skipped++;
+      }
+    } else {
+      // RPC failed — try to process anyway
+      newMeetings.push(withKey[i].google_event_id!);
+    }
+  }
+
+  onProgress?.(withKey.length, withKey.length);
+
+  if (newMeetings.length === 0) return { triggered: 0, failed: 0, skipped };
+
+  // Step 2: Fire all POST requests in parallel (fire-and-forget style)
+  const postResults = await Promise.allSettled(
+    newMeetings.map(key => triggerTranscriptionForKey(key))
+  );
+
   let triggered = 0;
   let failed = 0;
-  let skipped = 0;
-
-  for (let i = 0; i < withKey.length; i++) {
-    onProgress?.(i + 1, withKey.length);
-    try {
-      // Check status in meet_conferences — only call API for NEW
-      const info = await fetchTranscriptInfo(withKey[i].google_event_id!);
-      if (info.status && info.status.toLowerCase() !== 'new') {
-        skipped++;
-        continue;
-      }
-      await triggerTranscriptionForKey(withKey[i].google_event_id!);
-      triggered++;
-    } catch (e) {
-      console.warn(`[meetings] Transcription fetch failed for ${withKey[i].google_event_id}:`, e);
-      failed++;
-    }
+  for (const r of postResults) {
+    if (r.status === 'fulfilled') triggered++;
+    else { failed++; console.warn('[meetings] POST failed:', r.reason); }
   }
 
   return { triggered, failed, skipped };
