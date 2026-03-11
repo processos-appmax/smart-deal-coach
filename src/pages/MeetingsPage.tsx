@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { useToast } from '@/hooks/use-toast';
 import {
-  loadMeetingsFromDb, syncMeetConferences, clearAllMeetings, fetchTranscriptionsForAll, pullTranscriptions,
+  loadMeetingsFromDb, syncMeetConferences, fetchTranscriptionsForAll, pullTranscriptions,
   ensureAppmaxParticipantsRegistered,
   type DbMeeting
 } from '@/lib/meetingsService';
@@ -120,21 +120,16 @@ export default function MeetingsPage() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      // Step 1: Clear all existing meetings
-      setSyncProgress({ current: 0, total: 0, phase: 'Limpando reuniões...' });
-      toast({ title: 'Limpando reuniões...', description: 'Removendo dados antigos.' });
-      await clearAllMeetings();
-
-      // Step 2: Re-import from meet_conferences
+      // Step 1: Import new meetings from meet_conferences (call_interna=false only)
       setSyncProgress({ current: 0, total: 0, phase: 'Importando reuniões...' });
-      toast({ title: 'Importando reuniões...', description: 'Sincronizando do Google Meet.' });
+      toast({ title: 'Sincronizando...', description: 'Buscando novas reuniões do Google Meet.' });
       const syncResult = await syncMeetConferences();
 
-      // Step 3: Reload to get fresh list with google_event_ids
+      // Step 2: Reload to get fresh list with google_event_ids
       const freshMeetings = await loadMeetingsFromDb();
       setMeetings(freshMeetings);
 
-      // Step 4: Fetch transcriptions per conference_key
+      // Step 3: Fetch transcriptions per conference_key (only for meetings without transcription)
       const pendingCount = freshMeetings.filter(m => m.google_event_id && !m.transcricao).length;
       if (pendingCount > 0) {
         setSyncProgress({ current: 0, total: pendingCount, phase: 'Buscando transcrições...' });
@@ -144,7 +139,7 @@ export default function MeetingsPage() {
         });
         console.log(`[meetings] Transcription fetch: ${fetchResult.triggered} triggered, ${fetchResult.failed} failed`);
 
-        // Step 5: Wait for API to process, then pull transcript_text
+        // Step 4: Wait for API to process, then pull transcript_text
         setSyncProgress({ current: 0, total: 0, phase: 'Aguardando processamento...' });
         await new Promise(r => setTimeout(r, 3000));
 
@@ -156,12 +151,13 @@ export default function MeetingsPage() {
 
         toast({
           title: 'Sincronização concluída',
-          description: `${syncResult.inserted} reuniões importadas, ${fetchResult.triggered} transcrições solicitadas, ${transcriptCount} transcrições importadas.`,
+          description: `${syncResult.inserted} novas, ${syncResult.updated} atualizadas, ${transcriptCount} transcrições importadas.`,
         });
       } else {
+        await loadMeetings();
         toast({
           title: 'Sincronização concluída',
-          description: `${syncResult.inserted} reuniões importadas. Nenhuma transcrição pendente.`,
+          description: `${syncResult.inserted} novas, ${syncResult.updated} atualizadas. Nenhuma transcrição pendente.`,
         });
       }
     } catch (err: any) {
