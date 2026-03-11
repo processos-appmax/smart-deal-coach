@@ -24,7 +24,7 @@ export interface DbMeeting {
 }
 
 // ─── Transcription API config ────────────────────────────────────────────────
-const TRANSCRIPT_API_URL = 'https://appreciate-continuously-percentage-ranks.trycloudflare.com/run';
+const TRANSCRIPT_API_URL = 'https://trustee-appendix-collecting-transcription.trycloudflare.com/run-conference';
 const TRANSCRIPT_API_TOKEN = 'api-meet-comercial';
 
 /**
