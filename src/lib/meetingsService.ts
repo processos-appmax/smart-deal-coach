@@ -62,67 +62,52 @@ export async function triggerTranscriptionFetch(since: string): Promise<void> {
 }
 
 /**
- * Step 3: After transcription API runs, pull transcript_copied_file_id
- * from appmax.meet_conferences into saas.reunioes, then read the
- * Google Doc content and save as text in the transcricao column.
+ * Step 3: Pull transcript_text from appmax.meet_conferences into saas.reunioes.
+ * The transcription text is populated by the external service (Cloudflare worker)
+ * that reads Google Docs and saves the content into meet_conferences.transcript_text.
  */
 export async function pullTranscriptions(): Promise<number> {
   const empresaId = await getSaasEmpresaId();
 
-  // Get meetings that have no transcription yet but may have a file in meet_conferences
+  // Get meetings that have no transcription yet
   const { data: meetings } = await (supabase as any)
     .schema('saas')
     .from('reunioes')
-    .select('id, google_event_id, transcricao, transcript_file_id')
+    .select('id, google_event_id, transcricao')
     .eq('empresa_id', empresaId)
     .is('transcricao', null);
 
   if (!meetings || meetings.length === 0) return 0;
 
-  // For each meeting, check if meet_conferences has a transcript
   let count = 0;
   for (const m of meetings) {
     if (!m.google_event_id) continue;
 
-    // Query appmax.meet_conferences for transcript file IDs via RPC
+    // Query appmax.meet_conferences for transcript text via RPC
     const { data: fileData } = await (supabase as any)
       .schema('saas')
       .rpc('buscar_transcript_file', { p_conference_key: m.google_event_id });
 
+    const transcriptText = fileData?.transcript_text;
     const fileId = fileData?.transcript_copied_file_id;
-    if (!fileId) continue;
+    if (!transcriptText || transcriptText.trim().length < 10) continue;
 
-    // Read Google Doc content via export as plain text
     try {
-      const docText = await fetchGoogleDocAsText(fileId);
-      if (docText && docText.trim().length > 10) {
-        await (supabase as any)
-          .schema('saas')
-          .from('reunioes')
-          .update({
-            transcricao: docText,
-            transcript_file_id: fileId,
-          })
-          .eq('id', m.id);
-        count++;
-      }
+      await (supabase as any)
+        .schema('saas')
+        .from('reunioes')
+        .update({
+          transcricao: transcriptText,
+          transcript_file_id: fileId || null,
+        })
+        .eq('id', m.id);
+      count++;
     } catch (err) {
-      console.warn(`[meetings] Failed to fetch transcript for ${m.id}:`, err);
+      console.warn(`[meetings] Failed to save transcript for ${m.id}:`, err);
     }
   }
 
   return count;
-}
-
-/**
- * Fetch a Google Doc as plain text using the export link.
- * Works for Docs that are publicly shared or shared with the service.
- */
-async function fetchGoogleDocAsText(fileId: string): Promise<string> {
-  const exportUrl = `https://docs.google.com/document/d/${fileId}/export?format=txt`;
-  const res = await fetch(exportUrl);
-  if (!res.ok) throw new Error(`Google Doc export failed: ${res.status}`);
-  return await res.text();
 }
 
 export async function loadMeetingsFromDb(): Promise<DbMeeting[]> {
