@@ -847,8 +847,26 @@ export default function AIConfigPage() {
     },
     sentimental: {
       nome: 'Análise Sentimental',
-      descricao: 'Analisa o sentimento e tom emocional dos participantes da reunião',
-      prompt: 'Você é um especialista em análise de sentimentos. Analise a transcrição da reunião e identifique o tom emocional de cada participante, momentos de tensão, entusiasmo e frustração. Retorne APENAS JSON: {"sentimentoGeral": "<positivo|neutro|negativo>", "confianca": <0-100>, "momentos": [{"timestamp": "<momento>", "sentimento": "<tipo>", "descricao": "<detalhe>"}]}',
+      descricao: 'Classifica o nível de relacionamento e tom emocional da reunião',
+      prompt: `Você é um especialista em análise de sentimentos em reuniões de vendas.
+Analise a transcrição e classifique o nível de relacionamento geral da reunião.
+
+NÍVEIS DISPONÍVEIS (use exatamente um):
+- Positivo: reunião com boa energia, rapport, interesse genuíno
+- Neutro: reunião profissional sem sinais claros positivos ou negativos
+- Negativo: reunião com resistência, desinteresse ou conflito
+- Preocupado: cliente demonstra dúvidas, incertezas sobre a solução
+- Frustrado: cliente demonstra frustração, insatisfação ou impaciência
+
+Avalie cada critério abaixo e retorne APENAS JSON válido (sem markdown):
+{
+  "sentimento": "<Positivo|Neutro|Negativo|Preocupado|Frustrado>",
+  "confianca": <0-100>,
+  "resumo": "<1-2 frases sobre o tom emocional geral>",
+  "criteriaScores": [
+    { "id": "<id>", "label": "<nome>", "weight": <peso>, "score": <0-100>, "feedback": "<feedback>" }
+  ]
+}`,
     },
   };
 
@@ -862,7 +880,13 @@ export default function AIConfigPage() {
       nome: config.nome,
       descricao: config.descricao,
       prompt_sistema: config.prompt,
-      criterios: [],
+      criterios: tipo === 'sentimental' ? [
+        { id: 'positivo', label: 'Positivo', weight: 20, description: 'Boa energia, rapport, interesse genuíno do cliente', examples: ['Tom entusiasmado', 'Perguntas de aprofundamento'], positiveSignals: ['Cliente engajado', 'Risadas naturais', 'Elogios à solução'], negativeSignals: [] },
+        { id: 'neutro', label: 'Neutro', weight: 20, description: 'Profissional, sem sinais claros positivos ou negativos', examples: ['Tom formal', 'Respostas objetivas'], positiveSignals: ['Conversa fluida', 'Respostas diretas'], negativeSignals: [] },
+        { id: 'negativo', label: 'Negativo', weight: 20, description: 'Resistência, desinteresse ou conflito', examples: ['Recusa em responder', 'Desinteresse'], positiveSignals: [], negativeSignals: ['Tom hostil', 'Interrupções frequentes', 'Respostas monossilábicas'] },
+        { id: 'preocupado', label: 'Preocupado', weight: 20, description: 'Dúvidas, incertezas sobre a solução ou investimento', examples: ['Perguntas sobre risco', 'Hesitação'], positiveSignals: [], negativeSignals: ['Muitas perguntas de segurança', 'Pedidos de garantia', 'Menção a experiências ruins'] },
+        { id: 'frustrado', label: 'Frustrado', weight: 20, description: 'Frustração, insatisfação ou impaciência do cliente', examples: ['Reclamações', 'Tom impaciente'], positiveSignals: [], negativeSignals: ['Reclamações explícitas', 'Tom elevado', 'Ameaça de cancelamento'] },
+      ] : [],
       modelo_ia: 'gpt-4o-mini',
       temperatura: 0,
       ordem: siblings.length,

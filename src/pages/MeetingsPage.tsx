@@ -5,7 +5,7 @@ import {
   Video, Search, Brain, Clock, Calendar,
   User, Building2, ExternalLink, Sparkles, X,
   TrendingUp, TrendingDown, Lightbulb, AlertTriangle,
-  CheckCircle2, Target, MessageSquare, RefreshCw, Loader2, Users, Key
+  CheckCircle2, Target, MessageSquare, RefreshCw, Loader2, Users, Key, Heart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -431,6 +431,17 @@ export default function MeetingsPage() {
                         {selectedMeeting.score} pts
                       </span>
                     )}
+                    {(selectedMeeting as any).sentimento && (
+                      <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1',
+                        (selectedMeeting as any).sentimento === 'Positivo' ? 'bg-emerald-500/10 text-emerald-400' :
+                        (selectedMeeting as any).sentimento === 'Negativo' ? 'bg-red-500/10 text-red-400' :
+                        (selectedMeeting as any).sentimento === 'Preocupado' ? 'bg-amber-500/10 text-amber-400' :
+                        (selectedMeeting as any).sentimento === 'Frustrado' ? 'bg-orange-500/10 text-orange-400' :
+                        'bg-slate-500/10 text-slate-400'
+                      )}>
+                        <Heart className="w-2.5 h-2.5" /> {(selectedMeeting as any).sentimento}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button onClick={() => setSelectedMeeting(null)} className="w-6 h-6 rounded-md hover:bg-muted flex items-center justify-center ml-2">
@@ -567,6 +578,42 @@ export default function MeetingsPage() {
                             )}
                           </div>
                         )}
+
+                        {/* Nível de Relacionamento (Sentiment) */}
+                        {meetingEval.payload?.sentimento && (() => {
+                          const sentConfig: Record<string, { color: string; bg: string; border: string }> = {
+                            'Positivo': { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+                            'Neutro': { color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20' },
+                            'Negativo': { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
+                            'Preocupado': { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+                            'Frustrado': { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+                          };
+                          const s = meetingEval.payload.sentimento as string;
+                          const cfg = sentConfig[s] || sentConfig['Neutro'];
+                          return (
+                            <div className={cn('p-3 rounded-lg border', cfg.bg, cfg.border)}>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <p className={cn('text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1', cfg.color)}>
+                                  <Heart className="w-3 h-3" /> Nível de Relacionamento
+                                </p>
+                                <span className={cn('text-xs font-bold px-2.5 py-0.5 rounded-full', cfg.bg, cfg.color, cfg.border, 'border')}>
+                                  {s}
+                                </span>
+                              </div>
+                              {meetingEval.payload.sentimentoResumo && (
+                                <p className="text-xs text-muted-foreground leading-relaxed">{meetingEval.payload.sentimentoResumo}</p>
+                              )}
+                              {meetingEval.payload.sentimentoConfianca && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div className={cn('h-full rounded-full', cfg.bg.replace('/10', '/60'))} style={{ width: `${meetingEval.payload.sentimentoConfianca}%` }} />
+                                  </div>
+                                  <span className="text-[9px] text-muted-foreground font-mono">{meetingEval.payload.sentimentoConfianca}%</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Summary */}
                         {meetingEval.resumo && (

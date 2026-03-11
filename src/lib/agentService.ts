@@ -262,9 +262,11 @@ export function buildAgentTree(agents: AgentNode[]): {
   gerente: AgentNode | null;
   classificador: AgentNode | null;
   avaliadores: AgentNode[];
+  sentimentais: AgentNode[];
 } {
   const gerente = agents.find(a => a.tipo === 'gerente') || null;
   const classificador = agents.find(a => a.tipo === 'classificador') || null;
   const avaliadores = agents.filter(a => a.tipo === 'avaliador').sort((a, b) => a.ordem - b.ordem);
-  return { gerente, classificador, avaliadores };
+  const sentimentais = agents.filter(a => a.tipo === 'sentimental').sort((a, b) => a.ordem - b.ordem);
+  return { gerente, classificador, avaliadores, sentimentais };
 }

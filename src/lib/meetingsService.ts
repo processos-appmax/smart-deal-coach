@@ -22,6 +22,7 @@ export interface DbMeeting {
   vendedor_email?: string;
   google_event_id?: string;
   transcript_file_id?: string | null;
+  sentimento?: string | null;
 }
 
 // ─── Transcription API config ────────────────────────────────────────────────

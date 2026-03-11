@@ -21,6 +21,9 @@ export interface MultiAgentResult extends EvaluationResult {
   agenteAvaliadorId: string;
   chainLog: ChainStep[];
   participation: { email: string; name: string; percent: number }[];
+  sentimento?: string;
+  sentimentoConfianca?: number;
+  sentimentoResumo?: string;
 }
 
 // ─── Step 1: Classificador — detect meeting type ─────────────────────────────
@@ -116,6 +119,48 @@ Responda APENAS com JSON válido (sem markdown):
   return JSON.parse(raw);
 }
 
+// ─── Step 3: Sentimental — classify relationship level ───────────────────────
+async function analyzeSentiment(
+  sentimental: AgentNode,
+  apiToken: string,
+  titulo: string,
+  transcricao: string,
+): Promise<{ sentimento: string; confianca: number; resumo: string }> {
+  const criteriaText = (sentimental.criterios || []).map((c: any) =>
+    `- ${c.label} (peso ${c.weight}%): ${c.description}`
+  ).join('\n');
+
+  const prompt = `Analise a transcrição e classifique o nível de relacionamento.
+
+REUNIÃO: ${titulo}
+
+CRITÉRIOS:
+${criteriaText}
+
+TRANSCRIÇÃO:
+${transcricao.slice(0, 10000)}
+
+Responda APENAS com JSON válido (sem markdown):
+{"sentimento": "<Positivo|Neutro|Negativo|Preocupado|Frustrado>", "confianca": <0-100>, "resumo": "<1-2 frases>"}`;
+
+  const data = await callOpenAI(apiToken, {
+    model: sentimental.modelo_ia || 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: sentimental.prompt_sistema },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0,
+    max_tokens: 300,
+  });
+
+  const raw = (data.choices?.[0]?.message?.content || '').replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { sentimento: 'Neutro', confianca: 50, resumo: 'Não foi possível analisar o sentimento.' };
+  }
+}
+
 // ─── Main: run the full multi-agent chain ────────────────────────────────────
 export async function evaluateMeetingMultiAgent(
   apiToken: string,
@@ -128,7 +173,7 @@ export async function evaluateMeetingMultiAgent(
   if (!apiToken || !transcricao) return null;
 
   const agents = await loadAgentTree();
-  const { gerente, classificador, avaliadores } = buildAgentTree(agents);
+  const { gerente, classificador, avaliadores, sentimentais } = buildAgentTree(agents);
 
   if (!classificador || avaliadores.length === 0) return null;
 
@@ -203,6 +248,37 @@ export async function evaluateMeetingMultiAgent(
     duracao_ms: Date.now() - t1,
   });
 
+  // Step 4: Sentiment analysis (parallel-safe, runs after evaluation)
+  let sentimento: string | undefined;
+  let sentimentoConfianca: number | undefined;
+  let sentimentoResumo: string | undefined;
+
+  const activeSentimentais = sentimentais.filter(a => a.ativo);
+  if (activeSentimentais.length > 0) {
+    const sentimentalAgent = activeSentimentais[0];
+    const t2 = Date.now();
+    try {
+      const sentResult = await analyzeSentiment(sentimentalAgent, apiToken, titulo, transcricao);
+      sentimento = sentResult.sentimento;
+      sentimentoConfianca = sentResult.confianca;
+      sentimentoResumo = sentResult.resumo;
+      chainLog.push({
+        agente: sentimentalAgent.nome, tipo: 'sentimental',
+        input_resumo: `Transcrição: ${transcricao.length} chars`,
+        output_resumo: `Sentimento: ${sentimento} (${sentimentoConfianca}%)`,
+        duracao_ms: Date.now() - t2,
+      });
+    } catch (e) {
+      console.error('[multiAgent] Sentiment analysis failed:', e);
+      chainLog.push({
+        agente: sentimentalAgent.nome, tipo: 'sentimental',
+        input_resumo: `Transcrição: ${transcricao.length} chars`,
+        output_resumo: `Erro na análise de sentimento`,
+        duracao_ms: Date.now() - t2,
+      });
+    }
+  }
+
   // Calculate participation deterministically
   const participation = parseTranscriptParticipation(transcricao, participantEmails || []);
 
@@ -238,16 +314,22 @@ export async function evaluateMeetingMultiAgent(
         criticalAlerts: result.criticalAlerts,
         titulo,
         participation,
+        sentimento,
+        sentimentoConfianca,
+        sentimentoResumo,
       },
     });
 
   if (insertErr) console.error('[multiAgent] Insert failed:', insertErr);
 
-  // Update reunioes
+  // Update reunioes (include sentimento)
+  const reuniaoUpdate: any = { score: scoreVal, analisada_por_ia: true };
+  if (sentimento) reuniaoUpdate.sentimento = sentimento;
+
   await (supabase as any)
     .schema('saas')
     .from('reunioes')
-    .update({ score: scoreVal, analisada_por_ia: true })
+    .update(reuniaoUpdate)
     .eq('id', reuniaoId);
 
   return {
@@ -256,5 +338,8 @@ export async function evaluateMeetingMultiAgent(
     agenteAvaliadorId: selectedAvaliador.id,
     chainLog,
     participation,
+    sentimento,
+    sentimentoConfianca,
+    sentimentoResumo,
   };
 }
