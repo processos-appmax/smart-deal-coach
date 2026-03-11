@@ -32,6 +32,30 @@ const SCORE_CRITERIA = [
   { key: 'nextSteps', label: 'Próximos Passos', icon: '📅', tip: 'Clareza e comprometimento do fechamento' },
 ];
 
+/** Calculate speaking participation % from transcript text */
+function calcParticipation(transcript: string | null): Record<string, number> {
+  if (!transcript) return {};
+  const counts: Record<string, number> = {};
+  let total = 0;
+  // Match lines like "Name Name: text"
+  const lines = transcript.split('\n');
+  for (const line of lines) {
+    const match = line.match(/^([A-Za-zÀ-ÿ][\w\sÀ-ÿ.'-]{1,40}):\s/);
+    if (match) {
+      const name = match[1].trim();
+      const charCount = line.length - match[0].length;
+      counts[name] = (counts[name] || 0) + charCount;
+      total += charCount;
+    }
+  }
+  if (total === 0) return {};
+  const pct: Record<string, number> = {};
+  for (const [name, chars] of Object.entries(counts)) {
+    pct[name] = Math.round((chars / total) * 100);
+  }
+  return pct;
+}
+
 function ScoreBar({ value, label, icon, tip }: { value: number; label: string; icon: string; tip: string }) {
   const color = value >= 85
     ? 'hsl(168 80% 42%)'
@@ -74,6 +98,8 @@ export default function MeetingsPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
+  const [evalProgress, setEvalProgress] = useState({ current: 0, total: 0 });
+  const [evalCancelled, setEvalCancelled] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedMeeting, setSelectedMeeting] = useState<DbMeeting | null>(null);
@@ -135,6 +161,7 @@ export default function MeetingsPage() {
     }
   };
 
+  const cancelEvalRef = { current: false };
   const handleEvaluateAll = async () => {
     const token = tokens.meetings;
     if (!token?.startsWith('sk-')) {
@@ -147,8 +174,13 @@ export default function MeetingsPage() {
       return;
     }
     setEvaluating(true);
+    setEvalCancelled(false);
+    cancelEvalRef.current = false;
+    setEvalProgress({ current: 0, total: pending.length });
     let ok = 0, fail = 0;
     for (const m of pending) {
+      if (cancelEvalRef.current) break;
+      setEvalProgress({ current: ok + fail + 1, total: pending.length });
       try {
         await evaluateMeeting(token, 'gpt-4o-mini', m.id, m.titulo, m.transcricao!, m.vendedor_id || null);
         ok++;
@@ -159,7 +191,17 @@ export default function MeetingsPage() {
     }
     await loadMeetings();
     setEvaluating(false);
-    toast({ title: 'Avaliação concluída', description: `${ok} avaliadas, ${fail} falharam de ${pending.length} pendentes.` });
+    setEvalProgress({ current: 0, total: 0 });
+    if (cancelEvalRef.current) {
+      toast({ title: 'Avaliação cancelada', description: `${ok} avaliadas antes do cancelamento.` });
+    } else {
+      toast({ title: 'Avaliação concluída', description: `${ok} avaliadas, ${fail} falharam de ${pending.length} pendentes.` });
+    }
+  };
+
+  const handleCancelEval = () => {
+    cancelEvalRef.current = true;
+    setEvalCancelled(true);
   };
 
   const filtered = meetings.filter(m => {
@@ -194,16 +236,32 @@ export default function MeetingsPage() {
                 <Key className="w-3 h-3" />
                 {tokens.meetings?.startsWith('sk-') ? 'Token Reuniões ✓' : 'Sem token — Admin → Tokens OpenAI'}
               </span>
-              <Button
-                size="sm"
-                onClick={handleEvaluateAll}
-                disabled={evaluating || syncing || loading}
-                className="text-xs h-8"
-                variant="outline"
-              >
-                {evaluating ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Brain className="w-3.5 h-3.5 mr-1.5" />}
-                {evaluating ? 'Avaliando...' : 'Avaliar IA'}
-              </Button>
+              {evaluating ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-medium text-primary">
+                      Avaliando {evalProgress.current}/{evalProgress.total}
+                    </span>
+                    <div className="w-20 h-1 bg-muted rounded-full overflow-hidden mt-0.5">
+                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${evalProgress.total ? (evalProgress.current / evalProgress.total) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+                  <button onClick={handleCancelEval} className="w-5 h-5 rounded hover:bg-destructive/10 flex items-center justify-center" title="Cancelar">
+                    <X className="w-3 h-3 text-destructive" />
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleEvaluateAll}
+                  disabled={syncing || loading}
+                  className="text-xs h-8"
+                  variant="outline"
+                >
+                  <Brain className="w-3.5 h-3.5 mr-1.5" /> Avaliar IA
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={handleSync}
@@ -555,40 +613,69 @@ export default function MeetingsPage() {
                 )}
 
                 {/* ─ Participants tab ─ */}
-                {detailTab === 'participants' && (
-                  <div className="space-y-2">
-                    {selectedMeeting.participantes.length > 0 ? (
-                      selectedMeeting.participantes.map((p, i) => {
-                        const isExternal = !p.email.endsWith('@appmax.com.br');
-                        return (
-                          <div
-                            key={i}
-                            className={cn(
-                              'flex items-center gap-2.5 p-2.5 rounded-lg border',
-                              isExternal ? 'bg-accent/5 border-accent/15' : 'bg-secondary border-border'
-                            )}
-                          >
-                            <div className="w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                              {(p.name || p.email)[0].toUpperCase()}
+                {detailTab === 'participants' && (() => {
+                  const participation = calcParticipation(selectedMeeting.transcricao);
+                  return (
+                    <div className="space-y-2">
+                      {selectedMeeting.participantes.length > 0 ? (
+                        selectedMeeting.participantes.map((p, i) => {
+                          const isExternal = !p.email.endsWith('@appmax.com.br');
+                          const displayName = p.name || p.email.split('@')[0];
+                          // Match participation by name (fuzzy: first name match)
+                          const pctEntry = Object.entries(participation).find(([k]) =>
+                            k.toLowerCase().includes(displayName.toLowerCase().split(' ')[0]) ||
+                            displayName.toLowerCase().includes(k.toLowerCase().split(' ')[0])
+                          );
+                          const pct = pctEntry ? pctEntry[1] : 0;
+                          return (
+                            <div
+                              key={i}
+                              className={cn(
+                                'flex items-center gap-2.5 p-2.5 rounded-lg border',
+                                isExternal ? 'bg-accent/5 border-accent/15' : 'bg-secondary border-border'
+                              )}
+                            >
+                              <div className="w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                                {(p.name || p.email)[0].toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs font-medium truncate">{displayName}</p>
+                                  {pct > 0 && (
+                                    <span className={cn(
+                                      'text-[10px] font-bold',
+                                      pct >= 30 ? 'text-success' : pct >= 10 ? 'text-primary' : 'text-muted-foreground'
+                                    )}>{pct}%</span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground truncate">{p.email}</p>
+                                {pct > 0 && (
+                                  <div className="h-1 bg-muted rounded-full overflow-hidden mt-1">
+                                    <div
+                                      className="h-full rounded-full transition-all"
+                                      style={{
+                                        width: `${pct}%`,
+                                        background: pct >= 30 ? 'hsl(168 80% 42%)' : pct >= 10 ? 'hsl(210 100% 56%)' : 'hsl(var(--muted-foreground))',
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              {isExternal && (
+                                <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded flex-shrink-0">Externo</span>
+                              )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate">{p.name || p.email.split('@')[0]}</p>
-                              <p className="text-[10px] text-muted-foreground truncate">{p.email}</p>
-                            </div>
-                            {isExternal && (
-                              <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded">Externo</span>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="p-3 rounded-lg bg-muted/50 border border-border text-center">
-                        <Users className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                        <p className="text-xs text-muted-foreground">Nenhum participante registrado.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                          );
+                        })
+                      ) : (
+                        <div className="p-3 rounded-lg bg-muted/50 border border-border text-center">
+                          <Users className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                          <p className="text-xs text-muted-foreground">Nenhum participante registrado.</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
