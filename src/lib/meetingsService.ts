@@ -45,23 +45,74 @@ export async function syncMeetConferences(): Promise<{ inserted: number; updated
 }
 
 /**
- * Step 2: Trigger the transcription fetcher API for a date range.
- * This tells the external service to fetch transcriptions from Google Drive.
+ * Clear all meetings and related AI analyses for the current empresa.
+ * Used before a full re-import.
  */
-export async function triggerTranscriptionFetch(since: string): Promise<void> {
+export async function clearAllMeetings(): Promise<void> {
+  const empresaId = await getSaasEmpresaId();
+
+  // Delete AI analyses for meetings first (FK dependency)
+  await (supabase as any)
+    .schema('saas')
+    .from('analises_ia')
+    .delete()
+    .eq('empresa_id', empresaId)
+    .eq('tipo_contexto', 'reuniao');
+
+  // Delete all meetings
+  const { error } = await (supabase as any)
+    .schema('saas')
+    .from('reunioes')
+    .delete()
+    .eq('empresa_id', empresaId);
+
+  if (error) throw new Error(`Clear meetings error: ${error.message}`);
+}
+
+/**
+ * Trigger the transcription fetcher API for a single conference_key.
+ * POST /run-conference { "conference_key": "meet:xxx" }
+ */
+export async function triggerTranscriptionForKey(conferenceKey: string): Promise<void> {
   const res = await fetch(TRANSCRIPT_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-webhook-token': TRANSCRIPT_API_TOKEN,
     },
-    body: JSON.stringify({ since }),
+    body: JSON.stringify({ conference_key: conferenceKey }),
   });
 
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Transcription API error ${res.status}: ${text}`);
   }
+}
+
+/**
+ * Fetch transcriptions for all meetings by calling the API per conference_key.
+ * Returns the number of successfully triggered requests.
+ */
+export async function fetchTranscriptionsForAll(
+  meetings: DbMeeting[],
+  onProgress?: (current: number, total: number) => void,
+): Promise<{ triggered: number; failed: number }> {
+  const pending = meetings.filter(m => m.google_event_id && !m.transcricao);
+  let triggered = 0;
+  let failed = 0;
+
+  for (let i = 0; i < pending.length; i++) {
+    onProgress?.(i + 1, pending.length);
+    try {
+      await triggerTranscriptionForKey(pending[i].google_event_id!);
+      triggered++;
+    } catch (e) {
+      console.warn(`[meetings] Transcription fetch failed for ${pending[i].google_event_id}:`, e);
+      failed++;
+    }
+  }
+
+  return { triggered, failed };
 }
 
 /**

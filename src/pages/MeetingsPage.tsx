@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { useToast } from '@/hooks/use-toast';
 import {
-  loadMeetingsFromDb, syncMeetConferences, triggerTranscriptionFetch, pullTranscriptions,
+  loadMeetingsFromDb, syncMeetConferences, clearAllMeetings, fetchTranscriptionsForAll, pullTranscriptions,
   ensureAppmaxParticipantsRegistered,
   type DbMeeting
 } from '@/lib/meetingsService';
@@ -115,36 +115,61 @@ export default function MeetingsPage() {
     }
   }, [selectedMeeting?.id, selectedMeeting?.analisada_por_ia]);
 
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, phase: '' });
+
   const handleSync = async () => {
     setSyncing(true);
     try {
-      // Step 1: Sync meet_conferences → saas.reunioes
-      toast({ title: 'Sincronizando reuniões...', description: 'Importando dados do Google Meet.' });
+      // Step 1: Clear all existing meetings
+      setSyncProgress({ current: 0, total: 0, phase: 'Limpando reuniões...' });
+      toast({ title: 'Limpando reuniões...', description: 'Removendo dados antigos.' });
+      await clearAllMeetings();
+
+      // Step 2: Re-import from meet_conferences
+      setSyncProgress({ current: 0, total: 0, phase: 'Importando reuniões...' });
+      toast({ title: 'Importando reuniões...', description: 'Sincronizando do Google Meet.' });
       const syncResult = await syncMeetConferences();
 
-      // Step 2: Trigger transcription fetcher API (since Feb 26)
-      toast({ title: 'Buscando transcrições...', description: 'Solicitando arquivos de transcrição.' });
-      try {
-        await triggerTranscriptionFetch('2026-02-26T00:00:00Z');
-      } catch (err) {
-        console.warn('[meetings] Transcription API may be offline:', err);
+      // Step 3: Reload to get fresh list with google_event_ids
+      const freshMeetings = await loadMeetingsFromDb();
+      setMeetings(freshMeetings);
+
+      // Step 4: Fetch transcriptions per conference_key
+      const pendingCount = freshMeetings.filter(m => m.google_event_id && !m.transcricao).length;
+      if (pendingCount > 0) {
+        setSyncProgress({ current: 0, total: pendingCount, phase: 'Buscando transcrições...' });
+        toast({ title: 'Buscando transcrições...', description: `${pendingCount} reuniões para processar.` });
+        const fetchResult = await fetchTranscriptionsForAll(freshMeetings, (current, total) => {
+          setSyncProgress({ current, total, phase: 'Buscando transcrições...' });
+        });
+        console.log(`[meetings] Transcription fetch: ${fetchResult.triggered} triggered, ${fetchResult.failed} failed`);
+
+        // Step 5: Wait for API to process, then pull transcript_text
+        setSyncProgress({ current: 0, total: 0, phase: 'Aguardando processamento...' });
+        await new Promise(r => setTimeout(r, 3000));
+
+        setSyncProgress({ current: 0, total: 0, phase: 'Importando transcrições...' });
+        const transcriptCount = await pullTranscriptions();
+
+        // Final reload
+        await loadMeetings();
+
+        toast({
+          title: 'Sincronização concluída',
+          description: `${syncResult.inserted} reuniões importadas, ${fetchResult.triggered} transcrições solicitadas, ${transcriptCount} transcrições importadas.`,
+        });
+      } else {
+        toast({
+          title: 'Sincronização concluída',
+          description: `${syncResult.inserted} reuniões importadas. Nenhuma transcrição pendente.`,
+        });
       }
-
-      // Step 3: Pull transcription text from Google Drive into DB
-      const transcriptCount = await pullTranscriptions();
-
-      // Reload meetings
-      await loadMeetings();
-
-      toast({
-        title: 'Sincronização concluída',
-        description: `${syncResult.inserted} novas reuniões, ${syncResult.updated} atualizadas, ${transcriptCount} transcrições importadas.`,
-      });
     } catch (err: any) {
       console.error('[meetings] Sync error:', err);
       toast({ variant: 'destructive', title: 'Erro na sincronização', description: err.message });
     } finally {
       setSyncing(false);
+      setSyncProgress({ current: 0, total: 0, phase: '' });
     }
   };
 
@@ -282,15 +307,32 @@ export default function MeetingsPage() {
                   <Brain className="w-3.5 h-3.5 mr-1.5" /> Avaliar IA
                 </Button>
               )}
-              <Button
-                size="sm"
-                onClick={handleSync}
-                disabled={syncing || loading}
-                className="text-xs h-8 bg-gradient-primary"
-              >
-                {syncing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
-                {syncing ? 'Sincronizando...' : 'Sincronizar'}
-              </Button>
+              {syncing && syncProgress.phase ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-accent/30 bg-accent/5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-medium text-accent">
+                      {syncProgress.phase}
+                      {syncProgress.total > 0 && ` ${syncProgress.current}/${syncProgress.total}`}
+                    </span>
+                    {syncProgress.total > 0 && (
+                      <div className="w-20 h-1 bg-muted rounded-full overflow-hidden mt-0.5">
+                        <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${(syncProgress.current / syncProgress.total) * 100}%` }} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleSync}
+                  disabled={syncing || loading}
+                  className="text-xs h-8 bg-gradient-primary"
+                >
+                  {syncing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+                  {syncing ? 'Sincronizando...' : 'Sincronizar'}
+                </Button>
+              )}
             </div>
           </div>
 
