@@ -124,6 +124,86 @@ Responda APENAS com JSON válido (sem markdown):
   return result;
 }
 
+// ─── Parse transcript to calculate participation % by character count ────────
+export function parseTranscriptParticipation(
+  transcricao: string,
+  participantEmails: string[],
+): { email: string; name: string; percent: number }[] {
+  if (!transcricao || participantEmails.length === 0) return [];
+
+  // Google Meet transcripts format: "Speaker Name\nTimestamp\nText\n\n"
+  // or "Speaker Name\nText\n\n" — speaker name is on its own line before text
+  const lines = transcricao.split('\n');
+  const speakerCharCount: Record<string, number> = {};
+  let currentSpeaker = '';
+
+  // Build a map of email → possible display names (first.last from email)
+  const emailNameMap: Record<string, string[]> = {};
+  for (const email of participantEmails) {
+    const local = email.split('@')[0].toLowerCase();
+    const parts = local.split(/[._-]/);
+    emailNameMap[email] = parts;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Check if this line is a speaker name (short line, no punctuation at end,
+    // followed by text or timestamp)
+    const isTimestamp = /^\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?$/i.test(line);
+    if (isTimestamp) continue;
+
+    // A speaker line is typically short (<60 chars), doesn't end with common punctuation,
+    // and is followed by content
+    const looksLikeSpeaker = line.length < 60 &&
+      !/[.!?,;:]$/.test(line) &&
+      !/^\d/.test(line) &&
+      !line.includes('  ') &&
+      (i + 1 < lines.length);
+
+    if (looksLikeSpeaker) {
+      // Check if this matches any participant name
+      const lineLower = line.toLowerCase();
+      const matched = participantEmails.find(email => {
+        const parts = emailNameMap[email];
+        // Match if the line contains the first name or last name from email
+        return parts.some(p => p.length >= 3 && lineLower.includes(p));
+      });
+      if (matched || (!currentSpeaker && line.length < 40)) {
+        currentSpeaker = matched || line;
+        if (!speakerCharCount[currentSpeaker]) speakerCharCount[currentSpeaker] = 0;
+        continue;
+      }
+    }
+
+    // Count this line's characters for the current speaker
+    if (currentSpeaker) {
+      speakerCharCount[currentSpeaker] += line.length;
+    }
+  }
+
+  const totalChars = Object.values(speakerCharCount).reduce((s, c) => s + c, 0);
+  if (totalChars === 0) return [];
+
+  // Calculate raw percentages
+  const rawResults = participantEmails.map(email => {
+    const chars = speakerCharCount[email] || 0;
+    const name = email.split('@')[0].replace(/[._-]/g, ' ');
+    return { email, name, chars, percent: Math.round((chars / totalChars) * 100) };
+  });
+
+  // Adjust rounding so sum is exactly 100
+  const sum = rawResults.reduce((s, r) => s + r.percent, 0);
+  if (sum !== 100 && totalChars > 0) {
+    // Add/subtract difference from the largest participant
+    const sorted = [...rawResults].sort((a, b) => b.chars - a.chars);
+    sorted[0].percent += (100 - sum);
+  }
+
+  return rawResults.map(r => ({ email: r.email, name: r.name, percent: r.percent }));
+}
+
 // ─── Evaluate a meeting ──────────────────────────────────────────────────────
 export async function evaluateMeeting(
   apiToken: string,
@@ -144,14 +224,9 @@ export async function evaluateMeeting(
     `- ${c.label} (peso ${c.weight}%): ${c.description}. Sinais positivos: ${(c.positiveSignals || []).join(', ') || 'N/A'}. Sinais negativos: ${(c.negativeSignals || []).join(', ') || 'N/A'}.`
   ).join('\n');
 
-  const participantsList = participantEmails?.length
-    ? `\nPARTICIPANTES (emails): ${participantEmails.join(', ')}`
-    : '';
-
   const userPrompt = `Analise a seguinte transcrição de reunião de vendas.
 
 REUNIÃO: ${titulo}
-${participantsList}
 
 CRITÉRIOS DE AVALIAÇÃO:
 ${criteriaText}
@@ -167,19 +242,11 @@ Responda APENAS com JSON válido (sem markdown):
   "criticalAlerts": ["<alerta se houver>"],
   "criteriaScores": [
     { "id": "<id>", "label": "<nome>", "weight": <peso>, "score": <0-100>, "feedback": "<feedback>" }
-  ],
-  "participation": [
-    { "email": "<email do participante da lista acima>", "name": "<nome como aparece na transcrição>", "percent": <0-100> }
   ]
-}
+}`;
 
-REGRAS OBRIGATÓRIAS sobre participation:
-- Inclua TODOS os participantes da lista de PARTICIPANTES acima, sem exceção.
-- Associe cada pessoa da transcrição com o email correspondente (use nome/sobrenome para match).
-- A soma de TODOS os percent DEVE ser EXATAMENTE 100%. Verifique a soma antes de responder.
-- Calcule baseado no volume de fala (quantidade de texto/palavras) de cada pessoa.
-- Se um participante não falou na transcrição, inclua com percent: 0.
-- Exemplo: se há 4 participantes e um falou 60%, outro 25%, outro 10% e outro 5%, a soma é 100%. SEMPRE garanta isso.`;
+  // Calculate participation deterministically by character count
+  const participation = parseTranscriptParticipation(transcricao, participantEmails || []);
 
   const data = await callOpenAI(apiToken, {
     model: aiModel || 'gpt-4o-mini',
@@ -187,7 +254,7 @@ REGRAS OBRIGATÓRIAS sobre participation:
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
-    temperature: 0.3,
+    temperature: 0,
     max_tokens: 2000,
   });
 
@@ -223,7 +290,7 @@ REGRAS OBRIGATÓRIAS sobre participation:
         insights: result.insights,
         criticalAlerts: result.criticalAlerts,
         titulo,
-        participation: (result as any).participation || [],
+        participation,
       },
     });
 
