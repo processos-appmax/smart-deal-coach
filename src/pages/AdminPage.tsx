@@ -1053,8 +1053,15 @@ export default function AdminPage() {
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Adiciona uma camada extra de segurança exigindo um código temporário (TOTP) além da senha no login.
-                  Quando ativado, todos os usuários precisarão configurar um app autenticador (Google Authenticator, Authy, etc).
                 </p>
+
+                {/* Applies only to email/password */}
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                  <p className="text-xs text-muted-foreground">
+                    <strong>Aplica-se apenas a login por e-mail e senha.</strong> Usuários que fazem login via Google (SSO) já possuem a segurança do Google e não precisam de 2FA adicional.
+                  </p>
+                </div>
+
                 <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
                   <div className="flex items-center gap-3">
                     {twoFAEnabled
@@ -1064,8 +1071,8 @@ export default function AdminPage() {
                       <p className="text-sm font-medium">{twoFAEnabled ? '2FA Ativo' : '2FA Desativado'}</p>
                       <p className="text-xs text-muted-foreground">
                         {twoFAEnabled
-                          ? 'Todos os usuários precisam de código TOTP para fazer login'
-                          : 'Login apenas com e-mail e senha'}
+                          ? 'Usuários com login por e-mail/senha precisam de código TOTP'
+                          : 'Login por e-mail/senha sem verificação adicional'}
                       </p>
                     </div>
                   </div>
@@ -1082,8 +1089,8 @@ export default function AdminPage() {
                         toast({
                           title: twoFAEnabled ? '2FA desativado' : '2FA ativado',
                           description: twoFAEnabled
-                            ? 'A autenticação de dois fatores foi desativada para todos os usuários.'
-                            : 'Todos os usuários precisarão configurar o autenticador no próximo login.',
+                            ? 'A autenticação de dois fatores foi desativada.'
+                            : 'Usuários com login por e-mail/senha precisarão configurar o autenticador no próximo login.',
                         });
                       }, 800);
                     }}
@@ -1097,17 +1104,49 @@ export default function AdminPage() {
                     )}
                   </Button>
                 </div>
+
+                {/* How it works */}
                 {twoFAEnabled && (
-                  <div className="p-3 rounded-lg bg-success/5 border border-success/20">
-                    <p className="text-xs text-success">
-                      2FA está ativo. Os usuários que ainda não configuraram serão solicitados no próximo login.
-                    </p>
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-lg bg-success/5 border border-success/20">
+                      <p className="text-xs text-success font-medium mb-1">2FA está ativo</p>
+                      <p className="text-xs text-success/80">
+                        No próximo login por e-mail/senha, o usuário verá um QR Code para escanear com o app autenticador (Google Authenticator, Authy, Microsoft Authenticator, etc).
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-muted/30 border border-border/50 space-y-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fluxo de ativação para o usuário</p>
+                      <div className="space-y-2">
+                        {[
+                          { step: '1', text: 'No login, após digitar e-mail e senha, aparece a tela de configuração 2FA' },
+                          { step: '2', text: 'O sistema gera um QR Code exclusivo. O usuário escaneia com o app autenticador' },
+                          { step: '3', text: 'O usuário digita o código de 6 dígitos gerado pelo app para confirmar' },
+                          { step: '4', text: 'O sistema exibe 8 códigos de recuperação de uso único para caso perca o acesso ao app' },
+                          { step: '5', text: 'A partir daí, todo login por e-mail/senha pede o código TOTP de 6 dígitos' },
+                        ].map(item => (
+                          <div key={item.step} className="flex gap-2.5 items-start">
+                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/15 text-primary text-[10px] font-bold flex items-center justify-center">
+                              {item.step}
+                            </span>
+                            <p className="text-xs text-muted-foreground leading-relaxed">{item.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
+                      <p className="text-xs text-accent/90">
+                        <strong>Códigos de recuperação:</strong> Cada usuário recebe 8 códigos de recuperação de uso único ao configurar o 2FA. Se o usuário perder o app autenticador, pode usar um desses códigos para acessar a conta. Cada código só funciona uma vez. O admin pode resetar o 2FA de um usuário na seção Usuários.
+                      </p>
+                    </div>
                   </div>
                 )}
+
                 {!twoFAEnabled && (
                   <div className="p-3 rounded-lg bg-warning/5 border border-warning/20">
                     <p className="text-xs text-warning">
-                      Recomendamos ativar o 2FA para aumentar a segurança de acesso à plataforma.
+                      Recomendamos ativar o 2FA para usuários que fazem login por e-mail e senha. Quem usa Google SSO já está protegido.
                     </p>
                   </div>
                 )}
