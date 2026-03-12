@@ -144,20 +144,28 @@ export default function MeetingsPage() {
 
       // Step 3: Dispatch transcription POSTs via pg_net (server-side, no CORS)
       setSyncProgress({ current: 0, total: 0, phase: 'Disparando transcrições (server-side)...' });
-      toast({ title: 'Processando...', description: 'Enviando requisições de transcrição via servidor.' });
       const dispatchResult = await dispararTranscricoes();
       console.log(`[meetings] Dispatched: ${dispatchResult.dispatched}, Skipped: ${dispatchResult.skipped}, Keys:`, dispatchResult.keys);
 
-      // Step 4: Wait for webhooks to process, then pull transcript_text
+      // Step 4: Poll for transcriptions with retries (webhook takes 10-60s per meet)
+      let transcriptCount = 0;
       if (dispatchResult.dispatched > 0) {
-        setSyncProgress({ current: 0, total: 0, phase: `Aguardando ${dispatchResult.dispatched} transcrições...` });
-        // Wait proportionally: ~3s per dispatched request (they run in parallel on the server)
-        const waitTime = Math.min(dispatchResult.dispatched * 3000, 30000);
-        await new Promise(r => setTimeout(r, waitTime));
+        const maxAttempts = 12; // 12 * 10s = 2 minutes max
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          setSyncProgress({ current: attempt, total: maxAttempts, phase: `Aguardando transcrições... (tentativa ${attempt}/${maxAttempts})` });
+          await new Promise(r => setTimeout(r, 10000)); // wait 10s between polls
+          const pulled = await pullTranscriptions();
+          transcriptCount += pulled;
+          console.log(`[meetings] Poll attempt ${attempt}: pulled ${pulled} transcripts (total: ${transcriptCount})`);
+          if (transcriptCount >= dispatchResult.dispatched) {
+            console.log('[meetings] All dispatched transcripts received');
+            break;
+          }
+        }
+      } else {
+        // No new dispatches, just try pulling any pending
+        transcriptCount = await pullTranscriptions();
       }
-
-      setSyncProgress({ current: 0, total: 0, phase: 'Importando transcrições...' });
-      const transcriptCount = await pullTranscriptions();
 
       // Final reload
       await loadMeetings();
