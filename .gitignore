@@ -1,3 +1,6 @@
+# Scripts with credentials (never commit)
+scripts/fetch-transcripts.mjs
+
 # Logs
 logs
 *.log
