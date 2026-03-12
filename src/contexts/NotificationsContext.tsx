@@ -26,6 +26,7 @@ interface NotificationsContextValue {
   markAllAsRead: () => void;
   addNotification: (n: Omit<Notification, 'id' | 'read' | 'createdAt'>) => void;
   removeNotification: (id: string) => void;
+  refresh: () => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
@@ -34,16 +35,24 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
+  const refresh = useCallback(() => {
+    if (!user?.email) return;
+    loadNotifications(user.email)
+      .then(setNotifications)
+      .catch(() => {});
+  }, [user?.email]);
+
   // Load from DB when user changes
   useEffect(() => {
     if (!user?.email) {
       setNotifications([]);
       return;
     }
-    loadNotifications(user.email)
-      .then(setNotifications)
-      .catch(() => setNotifications([]));
-  }, [user?.email]);
+    refresh();
+    // Poll every 30s for new notifications
+    const interval = setInterval(refresh, 30000);
+    return () => clearInterval(interval);
+  }, [user?.email, refresh]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -74,7 +83,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <NotificationsContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, addNotification, removeNotification }}>
+    <NotificationsContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, addNotification, removeNotification, refresh }}>
       {children}
     </NotificationsContext.Provider>
   );

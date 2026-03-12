@@ -14,6 +14,7 @@ import {
   DEFAULT_WEBHOOK_CONFIGS,
 } from '@/lib/webhookService';
 import { useToast } from '@/hooks/use-toast';
+import { useNotifications } from '@/contexts/NotificationsContext';
 
 // ─── Icon map ──────────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -236,6 +237,7 @@ function WebhookRow({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function AutomationsPage() {
   const { toast } = useToast();
+  const { refresh: refreshNotifications } = useNotifications();
   const [configs, setConfigs] = useState<WebhookConfig[]>(() => loadWebhookConfigs());
   const [testingId, setTestingId] = useState<WebhookEventId | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('all');
@@ -270,6 +272,7 @@ export default function AutomationsPage() {
           description: `Alerta de teste disparado manualmente.`,
         });
         results.push('Alerta interno criado');
+        refreshNotifications();
       } catch (err: any) {
         results.push(`Erro no alerta: ${err.message}`);
       }
