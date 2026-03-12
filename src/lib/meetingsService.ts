@@ -326,8 +326,31 @@ export async function loadMeetingsFromDb(): Promise<DbMeeting[]> {
     return [];
   }
 
+  const googleEventIds = [...new Set((data || []).map((r: any) => r.google_event_id).filter(Boolean))];
+  let internalConferenceKeys = new Set<string>();
+
+  if (googleEventIds.length > 0) {
+    const { data: internalRows, error: internalError } = await (supabase as any)
+      .schema('saas')
+      .from('meet_conferences')
+      .select('conference_key')
+      .in('conference_key', googleEventIds)
+      .eq('call_interna', true);
+
+    if (internalError) {
+      console.warn('Failed to load internal conference keys:', internalError);
+    } else {
+      internalConferenceKeys = new Set((internalRows || []).map((r: any) => String(r.conference_key)));
+    }
+  }
+
+  const filteredRows = (data || []).filter((row: any) => {
+    if (!row.google_event_id) return true;
+    return !internalConferenceKeys.has(String(row.google_event_id));
+  });
+
   // Resolve vendedor_id → name/email
-  const vendedorIds = [...new Set((data || []).map((r: any) => r.vendedor_id).filter(Boolean))];
+  const vendedorIds = [...new Set(filteredRows.map((r: any) => r.vendedor_id).filter(Boolean))];
   let vendedorMap: Record<string, { nome: string; email: string }> = {};
 
   if (vendedorIds.length > 0) {
@@ -342,7 +365,7 @@ export async function loadMeetingsFromDb(): Promise<DbMeeting[]> {
     }
   }
 
-  return (data || []).map((r: any) => ({
+  return filteredRows.map((r: any) => ({
     id: r.id,
     titulo: r.titulo || '',
     data_reuniao: r.data_reuniao,
