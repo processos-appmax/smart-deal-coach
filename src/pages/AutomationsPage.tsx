@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
-  Zap, Plus, Play, Clock, Settings2, Brain, MessageSquare, TrendingUp,
+  Zap, Brain, MessageSquare, TrendingUp,
   Globe, WifiOff, UserPlus, BookOpen, GraduationCap, CheckCircle2,
   UserX, AlertTriangle, ChevronDown, ChevronRight, TestTube2, Save,
-  ToggleLeft, ToggleRight, Activity, Workflow, Timer, Loader2,
+  ToggleLeft, ToggleRight, Activity, Workflow, Timer,
   RefreshCw, ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -46,12 +45,6 @@ const DELAY_UNITS: { value: DelayUnit; label: string }[] = [
   { value: 'days',      label: 'Dias' },
 ];
 
-const AUTOMATIONS = [
-  { id: 'auto_001', name: 'Análise pós-reunião via IA', trigger: 'Reunião concluída', action: 'OpenAI → Scorecard automático', status: 'active', lastRun: '2026-03-08T16:00:00', runs: 42 },
-  { id: 'auto_002', name: 'Notificação no-show', trigger: 'Reunião marcada como no-show', action: 'WhatsApp → Follow-up automático', status: 'active', lastRun: '2026-03-07T10:00:00', runs: 8 },
-  { id: 'auto_003', name: 'Qualificação WhatsApp → HubSpot', trigger: 'Conversa com score > 80', action: 'Criar deal no HubSpot', status: 'paused', lastRun: '2026-03-04T14:00:00', runs: 15 },
-  { id: 'auto_004', name: 'Relatório semanal por email', trigger: 'Toda segunda-feira 08:00', action: 'Gerar PDF → Enviar por email', status: 'active', lastRun: '2026-03-02T08:00:00', runs: 6 },
-];
 
 // ─── Webhook Row ───────────────────────────────────────────────────────────────
 function WebhookRow({
@@ -268,8 +261,8 @@ export default function AutomationsPage() {
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-display font-bold">Automações & Webhooks</h1>
-          <p className="text-sm text-muted-foreground">Fluxos automáticos e integrações via webhook</p>
+          <h1 className="text-2xl font-display font-bold">Alertas & Webhooks</h1>
+          <p className="text-sm text-muted-foreground">Configure webhooks para alertas e integrações</p>
         </div>
         <div className="flex items-center gap-2">
           {hasUnsaved && (
@@ -342,50 +335,8 @@ export default function AutomationsPage() {
           </div>
         </div>
 
-        {/* ════ RIGHT: Automations + Legend ══════════════════════════════════ */}
+        {/* ════ RIGHT: Legend ═════════════════════════════════════════════ */}
         <div className="lg:col-span-2 space-y-5">
-
-          {/* Automations */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="section-title">Automações N8N</h2>
-              <Button size="sm" className="bg-gradient-primary text-xs h-7 gap-1">
-                <Plus className="w-3 h-3" /> Nova
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {AUTOMATIONS.map(a => (
-                <div key={a.id} className="glass-card p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                      <div className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0 mt-2', a.status === 'active' ? 'bg-success animate-pulse' : 'bg-muted-foreground')} />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold truncate">{a.name}</p>
-                        <p className="text-[10px] text-muted-foreground truncate">
-                          <span className="text-foreground/60">Gatilho:</span> {a.trigger}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground truncate">
-                          <span className="text-foreground/60">Ação:</span> {a.action}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full border', a.status === 'active' ? 'bg-success/10 text-success border-success/20' : 'bg-muted text-muted-foreground border-border')}>
-                        {a.status === 'active' ? 'Ativo' : 'Pausado'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/50 text-[10px] text-muted-foreground">
-                    <span className="flex items-center gap-0.5"><Play className="w-2.5 h-2.5" /> {a.runs}x</span>
-                    <span className="flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" /> {new Date(a.lastRun).toLocaleDateString('pt-BR')}</span>
-                    <Button size="sm" variant="ghost" className="ml-auto h-5 text-[10px] text-primary px-1.5">
-                      <Zap className="w-2.5 h-2.5 mr-0.5" /> Executar
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Delay guide */}
           <div className="glass-card p-4" style={{ background: 'linear-gradient(135deg, hsl(var(--primary)/0.05), hsl(var(--accent)/0.05))' }}>
