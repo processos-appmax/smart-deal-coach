@@ -9,9 +9,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  type WebhookConfig, type DelayUnit, type WebhookEventId,
+  type WebhookConfig, type DelayUnit, type WebhookEventId, type AlertTargetRole,
   loadWebhookConfigs, saveWebhookConfigs, testWebhook,
-  DEFAULT_WEBHOOK_CONFIGS,
+  DEFAULT_WEBHOOK_CONFIGS, ALL_TARGET_ROLES,
 } from '@/lib/webhookService';
 import { useToast } from '@/hooks/use-toast';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -179,6 +179,44 @@ function WebhookRow({
             </button>
           </div>
 
+          {/* Target roles (only when internal alert enabled) */}
+          {cfg.internalAlert && (
+            <div>
+              <label className="text-[11px] font-medium block mb-1.5 text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                <Bell className="w-3 h-3" /> Quem recebe o alerta
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_TARGET_ROLES.map(role => {
+                  const selected = cfg.targetRoles?.includes(role.value);
+                  return (
+                    <button
+                      key={role.value}
+                      onClick={() => {
+                        const current = cfg.targetRoles || [];
+                        const next = selected
+                          ? current.filter(r => r !== role.value)
+                          : [...current, role.value];
+                        onChange({ ...cfg, targetRoles: next });
+                      }}
+                      className={cn(
+                        'text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-all',
+                        selected
+                          ? 'bg-primary/10 text-primary border-primary/30'
+                          : 'bg-secondary text-muted-foreground border-border hover:text-foreground hover:bg-muted',
+                      )}>
+                      {role.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[9px] text-muted-foreground mt-1">
+                {(!cfg.targetRoles || cfg.targetRoles.length === 0)
+                  ? 'Nenhum selecionado = todos os usuários ativos recebem'
+                  : `Apenas: ${cfg.targetRoles.map(r => ALL_TARGET_ROLES.find(a => a.value === r)?.label || r).join(', ')}`}
+              </p>
+            </div>
+          )}
+
           {/* URL input (only when webhook enabled) */}
           {cfg.enabled && (
             <div>
@@ -298,19 +336,21 @@ export default function AutomationsPage() {
           type: alertType,
           title: `[Teste] ${cfg.label}`,
           description: `Alerta de teste disparado manualmente.`,
+          targetRoles: cfg.targetRoles.length > 0 ? cfg.targetRoles : undefined,
         });
-        results.push('Alerta interno criado no banco');
+        results.push(`Alerta criado no banco (${cfg.targetRoles.length > 0 ? cfg.targetRoles.join(', ') : 'todos'})`);
+        // Refresh from DB after a short delay so the notification persists
+        setTimeout(() => refreshNotifications(), 500);
       } catch (err: any) {
         console.error('[automations] createInternalAlert failed:', err);
         results.push(`Erro no banco: ${err.message}`);
       }
-      // Also add locally for immediate UI feedback
+      // Also add locally for immediate UI feedback (visible instantly)
       addNotification({
         type: alertType,
         title: `[Teste] ${cfg.label}`,
         description: `Alerta de teste disparado manualmente.`,
       });
-      results.push('Notificação adicionada ao sino');
     }
 
     // Test webhook URL

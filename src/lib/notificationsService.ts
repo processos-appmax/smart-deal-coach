@@ -87,25 +87,51 @@ export async function deleteNotification(notificationId: string): Promise<void> 
 }
 
 /**
- * Create an internal alert/notification for all users of the empresa.
+ * Create an internal alert/notification.
+ * When targetRoles is provided (non-empty), only users with those roles receive the alert.
+ * When targetRoles is empty/undefined, all active users receive the alert.
+ *
+ * Supported roles: gerente, coordenador, supervisor, responsavel (mapped to DB: vendedor for responsavel).
  */
 export async function createInternalAlert(params: {
   type: NotificationType;
   title: string;
   description: string;
   link?: string;
+  targetRoles?: string[];
 }): Promise<void> {
   const empresaId = await getSaasEmpresaId();
 
-  // Get all active users of the empresa
-  const { data: users } = await (supabase as any)
+  // Build user query
+  let query = (supabase as any)
     .schema('saas')
     .from('usuarios')
-    .select('id')
+    .select('id, cargo')
     .eq('empresa_id', empresaId)
     .eq('ativo', true);
 
-  if (!users || users.length === 0) return;
+  // Filter by roles if specified
+  const roles = params.targetRoles?.filter(r => r.length > 0) || [];
+  if (roles.length > 0) {
+    // Map frontend role names to DB cargo values
+    const dbRoles = roles.map(r => {
+      if (r === 'responsavel') return 'vendedor';
+      return r; // gerente, coordenador, supervisor are the same in DB
+    });
+    query = query.in('cargo', dbRoles);
+  }
+
+  const { data: users, error: usersError } = await query;
+
+  if (usersError) {
+    console.error('[notifications] createInternalAlert - users query error:', usersError);
+    throw new Error(`Erro ao buscar usuários: ${usersError.message}`);
+  }
+
+  if (!users || users.length === 0) {
+    console.warn('[notifications] createInternalAlert - no users found for roles:', roles);
+    return;
+  }
 
   const tipo = tipoToDb[params.type] || 'sistema';
 
@@ -120,12 +146,17 @@ export async function createInternalAlert(params: {
     status: 'nao_lida',
   }));
 
+  console.log('[notifications] createInternalAlert inserting', rows.length, 'notifications for roles:', roles.length > 0 ? roles : 'all');
+
   const { error } = await (supabase as any)
     .schema('saas')
     .from('notificacoes')
     .insert(rows);
 
   if (error) {
-    console.error('[notifications] createInternalAlert error:', error);
+    console.error('[notifications] createInternalAlert insert error:', error);
+    throw new Error(`Erro ao criar alertas: ${error.message}`);
   }
+
+  console.log('[notifications] createInternalAlert success:', rows.length, 'notifications created');
 }

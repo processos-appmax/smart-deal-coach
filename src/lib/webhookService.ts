@@ -16,6 +16,15 @@ export type WebhookEventId =
 
 export type DelayUnit = 'immediate' | 'seconds' | 'minutes' | 'hours' | 'days';
 
+export type AlertTargetRole = 'gerente' | 'coordenador' | 'supervisor' | 'responsavel';
+
+export const ALL_TARGET_ROLES: { value: AlertTargetRole; label: string }[] = [
+  { value: 'gerente', label: 'Gerente' },
+  { value: 'coordenador', label: 'Coordenador' },
+  { value: 'supervisor', label: 'Supervisor' },
+  { value: 'responsavel', label: 'Responsável' },
+];
+
 export interface WebhookConfig {
   id: WebhookEventId;
   label: string;
@@ -24,6 +33,7 @@ export interface WebhookConfig {
   icon: string;
   enabled: boolean;
   internalAlert: boolean; // also create internal notification
+  targetRoles: AlertTargetRole[]; // who receives the internal alert
   url: string;
   delayUnit: DelayUnit;
   delayValue: number; // ignored when unit = 'immediate'
@@ -49,6 +59,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'MessageSquare',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -62,6 +73,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'AlertTriangle',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -75,6 +87,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'WifiOff',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -88,6 +101,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'UserPlus',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -101,6 +115,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'BookOpen',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -114,6 +129,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'GraduationCap',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -127,6 +143,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'CheckCircle2',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -140,6 +157,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'UserX',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -153,6 +171,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'Brain',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -166,6 +185,7 @@ export const DEFAULT_WEBHOOK_CONFIGS: WebhookConfig[] = [
     icon: 'TrendingUp',
     enabled: false,
     internalAlert: false,
+    targetRoles: [],
     url: '',
     delayUnit: 'immediate',
     delayValue: 0,
@@ -235,6 +255,7 @@ export function dispatchWebhook(
         title: cfg.label,
         description: (data.message as string) || (data.description as string) || `Evento: ${eventId}`,
         link: data.link as string | undefined,
+        targetRoles: cfg.targetRoles?.length ? cfg.targetRoles : undefined,
       }).catch(err => console.error('[webhook] internal alert error:', err));
     });
   }
