@@ -143,40 +143,46 @@ export function parseTranscriptParticipation(
   const displayNameFromEmail = (email: string) =>
     email.split('@')[0].replace(/[._-]/g, ' ');
 
-  const lines = transcricao.split('\n');
+  const lines = transcricao
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\r/g, '').trim())
+    .filter(Boolean);
+
+  const ignoredSpeakers = new Set([
+    'read ai meeting notes',
+    'transcricao',
+    'participantes',
+    'meeting notes',
+  ]);
+
   const speakerCharCount: Record<string, number> = {};
   let currentSpeaker = '';
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+  const isTimestampLine = (value: string) =>
+    /^\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?$/i.test(value);
 
-    if (/^participantes\s*:?$/i.test(line)) continue;
+  const isValidSpeakerName = (value: string) => {
+    const n = normalize(value);
+    if (!n || n.length < 3) return false;
+    if (ignoredSpeakers.has(n)) return false;
+    if (/^\d/.test(n)) return false;
+    return true;
+  };
 
-    const isTimestampOnly = /^\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?$/i.test(line);
-    if (isTimestampOnly) continue;
+  for (const line of lines) {
+    if (isTimestampLine(line)) continue;
 
-    const inlineSpeakerMatch = line.match(/^(.*?)\s+\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?$/i);
-    if (inlineSpeakerMatch && inlineSpeakerMatch[1]?.trim()) {
-      currentSpeaker = inlineSpeakerMatch[1].trim();
-      if (!speakerCharCount[currentSpeaker]) speakerCharCount[currentSpeaker] = 0;
-      continue;
-    }
+    const speakerWithText = line.match(/^([^:]{2,80}):\s*(.*)$/);
+    if (speakerWithText) {
+      const speaker = speakerWithText[1].trim();
+      const content = (speakerWithText[2] || '').trim();
 
-    const next = (lines[i + 1] || '').trim();
-    const nextIsTimestamp = /^\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?$/i.test(next);
-
-    const looksLikeSpeaker =
-      line.length < 80 &&
-      !/[.!?,;:]$/.test(line) &&
-      !/^\d/.test(line) &&
-      !line.includes('  ') &&
-      nextIsTimestamp;
-
-    if (looksLikeSpeaker) {
-      currentSpeaker = line;
-      if (!speakerCharCount[currentSpeaker]) speakerCharCount[currentSpeaker] = 0;
-      continue;
+      if (isValidSpeakerName(speaker)) {
+        currentSpeaker = speaker;
+        if (!speakerCharCount[currentSpeaker]) speakerCharCount[currentSpeaker] = 0;
+        if (content) speakerCharCount[currentSpeaker] += content.length;
+        continue;
+      }
     }
 
     if (currentSpeaker) {
@@ -184,16 +190,19 @@ export function parseTranscriptParticipation(
     }
   }
 
-  const totalChars = Object.values(speakerCharCount).reduce((s, c) => s + c, 0);
+  const totalChars = Object.values(speakerCharCount).reduce((sum, chars) => sum + chars, 0);
   if (totalChars === 0) return [];
 
   const emailCandidates = participantEmails
     .filter(Boolean)
-    .map((email) => ({
-      email,
-      normalized: normalize(displayNameFromEmail(email)),
-      tokens: normalize(displayNameFromEmail(email)).split(' ').filter((t) => t.length >= 3),
-    }));
+    .map((email) => {
+      const normalized = normalize(displayNameFromEmail(email));
+      return {
+        email,
+        normalized,
+        tokens: normalized.split(' ').filter((t) => t.length >= 3),
+      };
+    });
 
   const mapSpeakerToEmail = (speaker: string): string | undefined => {
     if (emailCandidates.length === 0) return undefined;
@@ -201,11 +210,14 @@ export function parseTranscriptParticipation(
     const normalizedSpeaker = normalize(speaker);
     const speakerTokens = normalizedSpeaker.split(' ').filter((t) => t.length >= 3);
 
-    const exact = emailCandidates.find((c) => c.normalized === normalizedSpeaker);
+    const exact = emailCandidates.find((candidate) => candidate.normalized === normalizedSpeaker);
     if (exact) return exact.email;
 
-    const byToken = emailCandidates.find((c) => speakerTokens.some((t) => c.tokens.includes(t)));
-    return byToken?.email;
+    const tokenMatch = emailCandidates.find((candidate) =>
+      speakerTokens.some((token) => candidate.tokens.includes(token))
+    );
+
+    return tokenMatch?.email;
   };
 
   const rawResults = Object.entries(speakerCharCount).map(([speaker, chars]) => ({
@@ -215,15 +227,15 @@ export function parseTranscriptParticipation(
     percent: Math.round((chars / totalChars) * 100),
   }));
 
-  const sum = rawResults.reduce((s, r) => s + r.percent, 0);
+  const sum = rawResults.reduce((acc, row) => acc + row.percent, 0);
   if (sum !== 100 && rawResults.length > 0) {
     const sorted = [...rawResults].sort((a, b) => b.chars - a.chars);
     sorted[0].percent += (100 - sum);
   }
 
   return rawResults
-    .filter((r) => r.percent > 0)
-    .map((r) => ({ email: r.email, name: r.name, percent: r.percent }));
+    .filter((row) => row.percent > 0)
+    .map((row) => ({ email: row.email, name: row.name, percent: row.percent }));
 }
 
 // ─── Evaluate a meeting ──────────────────────────────────────────────────────
