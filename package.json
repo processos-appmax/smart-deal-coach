@@ -10,7 +10,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "meet:collector:install": "npm --prefix services/meet-collector install",
+    "meet:collector:dev": "npm --prefix services/meet-collector start",
+    "meet:collector:db:migrate": "npm --prefix services/meet-collector run db:migrate",
+    "meet:collector:db:check": "npm --prefix services/meet-collector run db:check"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

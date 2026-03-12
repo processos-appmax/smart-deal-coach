@@ -35,6 +35,45 @@ export interface TranscriptInfo {
   status?: string;
 }
 
+interface CollectorTranscriptResult {
+  transcript_text: string;
+  transcript_copied_file_id: string | null;
+}
+
+async function postCollector(action: 'run-conference' | 'transcript', body: Record<string, string>): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('meet-gateway', {
+    body: {
+      action,
+      ...body,
+    },
+  });
+
+  if (error) {
+    throw new Error(`Meet gateway error: ${error.message}`);
+  }
+
+  if (data?.ok === false) {
+    throw new Error(data?.error || 'Erro no meet-gateway');
+  }
+
+  return data;
+}
+
+async function getTranscriptFromCollector(conferenceKey: string): Promise<CollectorTranscriptResult | null> {
+  const payload = await postCollector('transcript', { conference_key: conferenceKey });
+  const result = payload?.result || payload;
+
+  const transcriptText = String(result?.transcript_text || '').trim();
+  const fileId = result?.transcript_copied_file_id || null;
+
+  if (!transcriptText || transcriptText.length < 10) return null;
+
+  return {
+    transcript_text: transcriptText,
+    transcript_copied_file_id: fileId,
+  };
+}
+
 
 /**
  * Step 1: Sync appmax.meet_conferences → saas.reunioes via RPC
@@ -48,6 +87,41 @@ export async function syncMeetConferences(): Promise<{ inserted: number; updated
 
   if (error) throw new Error(`Sync error: ${error.message}`);
   return data || { inserted: 0, updated: 0 };
+}
+
+/**
+ * Trigger conference-by-conference transcription fetch using meet-gateway.
+ */
+export async function triggerTranscriptionFetch(): Promise<{ queued: number; ok: number; fail: number }> {
+  const empresaId = await getSaasEmpresaId();
+
+  const { data, error } = await (supabase as any)
+    .schema('saas')
+    .from('reunioes')
+    .select('google_event_id')
+    .eq('empresa_id', empresaId)
+    .is('transcricao', null)
+    .not('google_event_id', 'is', null);
+
+  if (error) throw new Error(`Failed to list pending meetings: ${error.message}`);
+
+  const conferenceKeys = [...new Set((data || []).map((r: any) => String(r.google_event_id || '').trim()).filter(Boolean))];
+  if (conferenceKeys.length === 0) return { queued: 0, ok: 0, fail: 0 };
+
+  let ok = 0;
+  let fail = 0;
+
+  for (const conferenceKey of conferenceKeys) {
+    try {
+      await postCollector('run-conference', { conference_key: conferenceKey });
+      ok += 1;
+    } catch (err) {
+      console.warn(`[meetings] run-conference failed for ${conferenceKey}:`, err);
+      fail += 1;
+    }
+  }
+
+  return { queued: conferenceKeys.length, ok, fail };
 }
 
 /**
@@ -211,6 +285,32 @@ export async function fetchTranscriptsFromDrive(): Promise<{ fetched: number; er
   };
 }
 
+export async function resolveMeetingTranscript(
+  meetingId: string,
+  conferenceKey: string,
+): Promise<{ transcricao: string; transcript_file_id: string | null } | null> {
+  const transcript = await getTranscriptFromCollector(conferenceKey);
+  if (!transcript) return null;
+
+  const { error } = await (supabase as any)
+    .schema('saas')
+    .from('reunioes')
+    .update({
+      transcricao: transcript.transcript_text,
+      transcript_file_id: transcript.transcript_copied_file_id,
+    })
+    .eq('id', meetingId);
+
+  if (error) {
+    throw new Error(`Failed to persist transcript: ${error.message}`);
+  }
+
+  return {
+    transcricao: transcript.transcript_text,
+    transcript_file_id: transcript.transcript_copied_file_id,
+  };
+}
+
 export async function loadMeetingsFromDb(): Promise<DbMeeting[]> {
   const empresaId = await getSaasEmpresaId();
 
@@ -259,6 +359,7 @@ export async function loadMeetingsFromDb(): Promise<DbMeeting[]> {
     vendedor_nome: vendedorMap[r.vendedor_id]?.nome,
     vendedor_email: vendedorMap[r.vendedor_id]?.email,
     google_event_id: r.google_event_id,
+    transcript_file_id: r.transcript_file_id || null,
     sentimento: r.sentimento || null,
     meeting_code: r.link_meet ? r.link_meet.replace('https://meet.google.com/', '') : null,
   }));

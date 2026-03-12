@@ -13,7 +13,7 @@ import { useAppConfig } from '@/contexts/AppConfigContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   loadMeetingsFromDb, syncMeetConferences, clearAllMeetings, dispararTranscricoes, pullTranscriptions,
-  fetchTranscriptsFromDrive, ensureAppmaxParticipantsRegistered, fetchTranscriptInfo,
+  fetchTranscriptsFromDrive, ensureAppmaxParticipantsRegistered, fetchTranscriptInfo, resolveMeetingTranscript,
   type DbMeeting, type TranscriptInfo
 } from '@/lib/meetingsService';
 import { evaluateMeeting, loadEvaluationByEntity, type StoredEvaluation } from '@/lib/evaluationService';
@@ -34,6 +34,12 @@ const SCORE_CRITERIA = [
   { key: 'objections', label: 'Objeções', icon: '🛡️', tip: 'Tratamento de resistências do cliente' },
   { key: 'nextSteps', label: 'Próximos Passos', icon: '📅', tip: 'Clareza e comprometimento do fechamento' },
 ];
+
+const TRANSCRIPT_PLACEHOLDER_RE = /^\[Transcrição no Drive:\s*(?:ID-)?([A-Za-z0-9_-]+)\]$/i;
+
+function isTranscriptPlaceholder(text: string | null | undefined): boolean {
+  return TRANSCRIPT_PLACEHOLDER_RE.test(String(text || '').trim());
+}
 
 
 function ScoreBar({ value, label, icon, tip }: { value: number; label: string; icon: string; tip: string }) {
@@ -87,6 +93,7 @@ export default function MeetingsPage() {
   const [meetingEval, setMeetingEval] = useState<(StoredEvaluation & { payload?: any }) | null>(null);
   const [reEvaluating, setReEvaluating] = useState(false);
   const [transcriptInfo, setTranscriptInfo] = useState<TranscriptInfo | null>(null);
+  const [hydratingTranscript, setHydratingTranscript] = useState(false);
 
   const loadMeetings = useCallback(async () => {
     try {
@@ -106,6 +113,14 @@ export default function MeetingsPage() {
   }, []);
 
   useEffect(() => { loadMeetings(); }, [loadMeetings]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      loadMeetings().catch((err) => console.warn('[meetings] auto refresh failed:', err));
+    }, 60_000);
+
+    return () => clearInterval(timer);
+  }, [loadMeetings]);
 
   // Load evaluation when meeting is selected
   useEffect(() => {
@@ -127,6 +142,41 @@ export default function MeetingsPage() {
       setTranscriptInfo(null);
     }
   }, [selectedMeeting?.id, selectedMeeting?.google_event_id]);
+
+  useEffect(() => {
+    if (!selectedMeeting?.id || !selectedMeeting.google_event_id) return;
+    if (!isTranscriptPlaceholder(selectedMeeting.transcricao)) return;
+
+    let cancelled = false;
+    setHydratingTranscript(true);
+
+    resolveMeetingTranscript(selectedMeeting.id, selectedMeeting.google_event_id)
+      .then((resolved) => {
+        if (cancelled || !resolved) return;
+
+        setMeetings(prev => prev.map(m =>
+          m.id === selectedMeeting.id
+            ? { ...m, transcricao: resolved.transcricao, transcript_file_id: resolved.transcript_file_id }
+            : m
+        ));
+
+        setSelectedMeeting(prev =>
+          prev && prev.id === selectedMeeting.id
+            ? { ...prev, transcricao: resolved.transcricao, transcript_file_id: resolved.transcript_file_id }
+            : prev
+        );
+      })
+      .catch((err) => {
+        console.warn('[meetings] Failed to resolve placeholder transcript:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setHydratingTranscript(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMeeting?.id, selectedMeeting?.google_event_id, selectedMeeting?.transcricao]);
 
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, phase: '' });
 
@@ -673,7 +723,7 @@ export default function MeetingsPage() {
                     <div className="flex items-center gap-2 text-xs">
                       <span className="text-muted-foreground">Transcrição:</span>
                       <span className={cn('font-medium', selectedMeeting.transcricao ? 'text-success' : 'text-muted-foreground')}>
-                        {selectedMeeting.transcricao ? 'Disponível' : 'Não disponível'}
+                        {hydratingTranscript ? 'Carregando transcrição...' : (selectedMeeting.transcricao ? 'Disponível' : 'Não disponível')}
                       </span>
                     </div>
                     {transcriptInfo?.transcript_copied_file_id && (
