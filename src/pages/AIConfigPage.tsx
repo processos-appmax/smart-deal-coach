@@ -981,21 +981,24 @@ function CanvasTreeNode({
       </div>
 
       {/* Vertical stem down from parent */}
-      <div className="w-px h-10 bg-border/50" />
+      <div className="w-px h-8 bg-border/50" />
 
       {/* Children row with horizontal connector */}
-      <div className="relative flex items-start">
-        {/* Horizontal connector bar (absolute, from center of first col to center of last col) */}
+      <div className="relative flex items-start gap-6">
+        {/* Horizontal connector bar spanning from center of first to center of last */}
         {colCount > 1 && (
           <div
-            className="absolute top-0 h-px bg-border/50"
-            style={{ left: `calc(100% / ${colCount} / 2)`, right: `calc(100% / ${colCount} / 2)` }}
+            className="absolute top-0 h-px bg-border/50 pointer-events-none"
+            style={{
+              left: columns[0]?.child ? `calc(${100 / colCount / 2}%)` : '50%',
+              right: columns[colCount - 1]?.child ? `calc(${100 / colCount / 2}%)` : '50%',
+            }}
           />
         )}
 
-        {/* Each column with equal flex so the bar lines up */}
-        {columns.map((col, i) => (
-          <div key={col.child?.id ?? 'add'} className="flex flex-col items-center flex-1" style={{ minWidth: 160 }}>
+        {/* Each column — fixed width, not flex */}
+        {columns.map((col) => (
+          <div key={col.child?.id ?? 'add'} className="flex flex-col items-center" style={{ minWidth: 230 }}>
             {/* Vertical drop from horizontal bar to child */}
             <div className="w-px h-6 bg-border/50" />
 
