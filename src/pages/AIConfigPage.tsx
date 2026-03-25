@@ -911,14 +911,12 @@ function AgentConfigModal({
 // ─── "+" button on a connector line (HubSpot style) ─────────────────────────
 function ConnectorWithAdd({
   parentId,
-  onAddAgent,
-  height = 32,
-  vertical = true,
+  onInsertBetween,
+  height = 40,
 }: {
   parentId: string;
-  onAddAgent: (parentId: string, tipo: AgentTipo, insertIndex?: number) => void;
+  onInsertBetween: (parentId: string, tipo: AgentTipo) => void;
   height?: number;
-  vertical?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const types: { tipo: AgentTipo; label: string; icon: any; color: string }[] = [
@@ -947,14 +945,13 @@ function ConnectorWithAdd({
           <Plus className="w-3 h-3" />
         </button>
       </div>
-      {/* Dropdown menu */}
       {open && (
         <div className="absolute top-1/2 left-full ml-2 z-50 bg-background border border-border rounded-xl shadow-2xl p-1.5 min-w-[170px]"
           onClick={e => e.stopPropagation()}>
           {types.map(t => (
             <button
               key={t.tipo}
-              onClick={() => { onAddAgent(parentId, t.tipo); setOpen(false); }}
+              onClick={() => { onInsertBetween(parentId, t.tipo); setOpen(false); }}
               className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-muted transition-colors text-left"
             >
               <t.icon className={cn('w-3.5 h-3.5', t.color)} />
@@ -975,6 +972,7 @@ function CanvasTreeNode({
   onClickAgent,
   onToggleAgent,
   onAddAgent,
+  onInsertBetween,
 }: {
   agent: AgentNode;
   agents: AgentNode[];
@@ -982,6 +980,7 @@ function CanvasTreeNode({
   onClickAgent: (id: string) => void;
   onToggleAgent: (a: AgentNode) => void;
   onAddAgent: (parentId: string, tipo: AgentTipo, insertIndex?: number) => void;
+  onInsertBetween: (parentId: string, tipo: AgentTipo) => void;
 }) {
   const children = getChildren(agent.id);
   const colCount = children.length + 1;
@@ -1013,8 +1012,8 @@ function CanvasTreeNode({
         <AgentNode_ agent={agent} onClick={() => onClickAgent(agent.id)} onToggle={() => onToggleAgent(agent)} />
       </div>
 
-      {/* Vertical connector with "+" button (HubSpot style) */}
-      <ConnectorWithAdd parentId={agent.id} onAddAgent={onAddAgent} height={40} />
+      {/* Vertical connector with "+" button (HubSpot style) — inserts between */}
+      <ConnectorWithAdd parentId={agent.id} onInsertBetween={onInsertBetween} height={40} />
 
       {/* Children row with horizontal connector */}
       <div ref={rowRef} className="relative flex items-start gap-4">
@@ -1038,6 +1037,7 @@ function CanvasTreeNode({
               onClickAgent={onClickAgent}
               onToggleAgent={onToggleAgent}
               onAddAgent={onAddAgent}
+              onInsertBetween={onInsertBetween}
             />
           </div>
         ))}
@@ -1262,6 +1262,42 @@ Avalie cada critério abaixo e retorne APENAS JSON válido (sem markdown):
       setEditingAgentId(saved.id);
       setAddingChildFor(null);
     }
+  };
+
+  // Insert a new agent BETWEEN a parent and its current children
+  // New agent becomes child of parent, existing children become children of new agent
+  const handleInsertBetween = async (parentId: string, tipo: AgentTipo) => {
+    const config = defaultAgentConfig[tipo];
+    if (!config) return;
+
+    // 1. Create the new agent as child of parent
+    const saved = await saveAgent({
+      parent_id: parentId,
+      modulo: activeType,
+      tipo,
+      nome: config.nome,
+      descricao: config.descricao,
+      prompt_sistema: config.prompt,
+      criterios: [],
+      modelo_ia: 'gpt-4o-mini',
+      temperatura: 0,
+      ordem: 0,
+      ativo: true,
+    });
+
+    if (!saved) return;
+
+    // 2. Move all existing children of parent to be children of new agent
+    const existingChildren = currentAgents.filter(a => a.parent_id === parentId && a.id !== saved.id);
+    for (const child of existingChildren) {
+      await saveAgent({ ...child, parent_id: saved.id });
+    }
+
+    // 3. Reload tree
+    const tree = await loadAgentTree(activeType);
+    setCurrentAgents(tree);
+    setEditingAgentId(saved.id);
+    toast({ title: 'Agente inserido!', description: `${config.nome} adicionado entre o pai e os filhos existentes.` });
   };
 
   const handleToggleAgent = async (agent: AgentNode) => {
@@ -1516,6 +1552,7 @@ Avalie cada critério abaixo e retorne APENAS JSON válido (sem markdown):
                       onClickAgent={setEditingAgentId}
                       onToggleAgent={handleToggleAgent}
                       onAddAgent={handleAddAgent}
+                      onInsertBetween={handleInsertBetween}
                     />
                   )}
                 </div>
@@ -1697,6 +1734,7 @@ Avalie cada critério abaixo e retorne APENAS JSON válido (sem markdown):
                       onClickAgent={setEditingAgentId}
                       onToggleAgent={handleToggleAgent}
                       onAddAgent={handleAddAgent}
+                      onInsertBetween={handleInsertBetween}
                     />
                   )}
                 </div>
