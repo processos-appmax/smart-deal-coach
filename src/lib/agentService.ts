@@ -43,7 +43,12 @@ export interface AgentFile {
 // ─── Load full agent tree for current empresa (filtered by modulo) ───────────
 export async function loadAgentTree(modulo: AgentModulo = 'meetings'): Promise<AgentNode[]> {
   const empresaId = await getSaasEmpresaId();
-  const { data, error } = await (supabase as any)
+
+  // Try with modulo filter first; fall back to unfiltered if column doesn't exist yet
+  let data: any[] | null = null;
+  let error: any = null;
+
+  const res = await (supabase as any)
     .schema('saas')
     .from('agentes_ia')
     .select('*')
@@ -51,22 +56,44 @@ export async function loadAgentTree(modulo: AgentModulo = 'meetings'): Promise<A
     .eq('modulo', modulo)
     .order('ordem', { ascending: true });
 
-  if (error) {
+  data = res.data;
+  error = res.error;
+
+  // If modulo column doesn't exist yet, load all and filter client-side
+  if (error && (error.message?.includes('modulo') || error.code === '42703')) {
+    console.warn('[agentService] modulo column not found, loading all agents');
+    const fallback = await (supabase as any)
+      .schema('saas')
+      .from('agentes_ia')
+      .select('*')
+      .eq('empresa_id', empresaId)
+      .order('ordem', { ascending: true });
+
+    if (fallback.error) {
+      console.error('[agentService] loadAgentTree fallback error:', fallback.error);
+      return [];
+    }
+    // For meetings, return all (legacy). For whatsapp, return empty (no legacy agents).
+    data = modulo === 'meetings' ? (fallback.data || []) : [];
+  } else if (error) {
     console.error('[agentService] loadAgentTree error:', error);
     return [];
   }
+
   return (data || []) as AgentNode[];
 }
 
 // ─── Save (upsert) a single agent ───────────────────────────────────────────
 export async function saveAgent(agent: Partial<AgentNode> & { tipo: AgentTipo; nome: string }): Promise<AgentNode | null> {
   const empresaId = await getSaasEmpresaId();
-  const payload = {
+  const payload: Record<string, any> = {
     ...agent,
     empresa_id: empresaId,
     criterios: JSON.parse(JSON.stringify(agent.criterios || [])),
     atualizado_em: new Date().toISOString(),
   };
+  // Include modulo if provided
+  if (agent.modulo) payload.modulo = agent.modulo;
 
   if (agent.id) {
     // Update existing
