@@ -908,15 +908,17 @@ function AgentConfigModal({
   );
 }
 
-// ─── Inline add button (between siblings — visible on hover of gap area) ────
-function InlineInsertButton({
+// ─── "+" button on a connector line (HubSpot style) ─────────────────────────
+function ConnectorWithAdd({
   parentId,
-  insertIndex,
   onAddAgent,
+  height = 32,
+  vertical = true,
 }: {
   parentId: string;
-  insertIndex: number;
-  onAddAgent: (parentId: string, tipo: AgentTipo, insertIndex: number) => void;
+  onAddAgent: (parentId: string, tipo: AgentTipo, insertIndex?: number) => void;
+  height?: number;
+  vertical?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const types: { tipo: AgentTipo; label: string; icon: any; color: string }[] = [
@@ -926,29 +928,33 @@ function InlineInsertButton({
   ];
 
   return (
-    <div className="relative flex items-center self-stretch group/gap" data-agent-node>
-      {/* Wide hover zone */}
-      <div className="w-8 flex items-center justify-center self-stretch">
+    <div className="relative flex flex-col items-center" style={{ height }} data-agent-node>
+      {/* The line */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div style={{ width: 2, height: '100%', background: 'rgba(255,255,255,0.5)' }} />
+      </div>
+      {/* The "+" button centered on the line */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
         <button
           onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
           className={cn(
-            'w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md',
+            'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all',
             open
-              ? 'bg-primary text-primary-foreground scale-110'
-              : 'bg-primary/70 text-primary-foreground opacity-0 group-hover/gap:opacity-100 hover:scale-110'
+              ? 'bg-primary border-primary text-primary-foreground scale-110'
+              : 'bg-background border-border text-muted-foreground hover:border-primary hover:text-primary hover:scale-110'
           )}
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-3 h-3" />
         </button>
       </div>
+      {/* Dropdown menu */}
       {open && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 bg-background border border-border rounded-xl shadow-2xl p-1.5 min-w-[170px]"
+        <div className="absolute top-1/2 left-full ml-2 z-50 bg-background border border-border rounded-xl shadow-2xl p-1.5 min-w-[170px]"
           onClick={e => e.stopPropagation()}>
-          <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold px-2.5 py-1">Inserir aqui</p>
           {types.map(t => (
             <button
               key={t.tipo}
-              onClick={() => { onAddAgent(parentId, t.tipo, insertIndex); setOpen(false); }}
+              onClick={() => { onAddAgent(parentId, t.tipo); setOpen(false); }}
               className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-muted transition-colors text-left"
             >
               <t.icon className={cn('w-3.5 h-3.5', t.color)} />
@@ -968,8 +974,6 @@ function CanvasTreeNode({
   getChildren,
   onClickAgent,
   onToggleAgent,
-  addingChildFor,
-  setAddingChildFor,
   onAddAgent,
 }: {
   agent: AgentNode;
@@ -977,49 +981,10 @@ function CanvasTreeNode({
   getChildren: (parentId: string) => AgentNode[];
   onClickAgent: (id: string) => void;
   onToggleAgent: (a: AgentNode) => void;
-  addingChildFor: string | null;
-  setAddingChildFor: (id: string | null) => void;
   onAddAgent: (parentId: string, tipo: AgentTipo, insertIndex?: number) => void;
 }) {
   const children = getChildren(agent.id);
-  const addableTypes: { tipo: AgentTipo; label: string; icon: any; color: string }[] = [
-    { tipo: 'classificador', label: 'Classificador', icon: GitBranch, color: 'text-orange-400' },
-    { tipo: 'avaliador', label: 'Avaliador', icon: Users, color: 'text-blue-400' },
-    { tipo: 'sentimental', label: 'Sentimental', icon: Heart, color: 'text-purple-400' },
-  ];
-
-  // Columns: children interleaved with insert buttons, plus add-at-end button
-  const colCount = children.length + 1; // children + add button
-
-  const addButton = (
-    <div className="relative" data-agent-node>
-      <button
-        onClick={(e) => { e.stopPropagation(); setAddingChildFor(addingChildFor === agent.id ? null : agent.id); }}
-        className="px-5 py-3 rounded-2xl border-2 border-dashed border-border/40 hover:border-primary/40 hover:bg-primary/5 transition-all flex flex-col items-center gap-1.5 min-w-[130px]"
-      >
-        <div className="w-8 h-8 rounded-xl bg-muted/80 flex items-center justify-center">
-          <Plus className="w-4 h-4 text-muted-foreground" />
-        </div>
-        <span className="text-[10px] text-muted-foreground font-medium">Adicionar Agente</span>
-      </button>
-      {addingChildFor === agent.id && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-background border border-border rounded-xl shadow-2xl p-1.5 min-w-[180px]"
-          onClick={e => e.stopPropagation()}>
-          <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold px-2.5 py-1.5">Tipo do Agente</p>
-          {addableTypes.map(t => (
-            <button
-              key={t.tipo}
-              onClick={() => onAddAgent(agent.id, t.tipo)}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-muted transition-colors text-left"
-            >
-              <t.icon className={cn('w-4 h-4', t.color)} />
-              <span className="text-xs font-medium">{t.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  const colCount = children.length + 1;
 
   const rowRef = useRef<HTMLDivElement>(null);
   const [hBar, setHBar] = useState<{ left: number; width: number } | null>(null);
@@ -1043,13 +1008,17 @@ function CanvasTreeNode({
 
   return (
     <div className="flex flex-col items-center">
+      {/* This node card */}
       <div data-agent-node>
         <AgentNode_ agent={agent} onClick={() => onClickAgent(agent.id)} onToggle={() => onToggleAgent(agent)} />
       </div>
 
-      <div className="h-8 pointer-events-none" style={{ width: 2, background: 'rgba(255,255,255,0.5)' }} />
+      {/* Vertical connector with "+" button (HubSpot style) */}
+      <ConnectorWithAdd parentId={agent.id} onAddAgent={onAddAgent} height={40} />
 
-      <div ref={rowRef} className="relative flex items-start">
+      {/* Children row with horizontal connector */}
+      <div ref={rowRef} className="relative flex items-start gap-4">
+        {/* Horizontal bar */}
         {hBar && (
           <div
             className="absolute top-0 pointer-events-none"
@@ -1057,33 +1026,35 @@ function CanvasTreeNode({
           />
         )}
 
-        {/* Render children with insert buttons between them */}
-        {children.map((child, i) => (
-          <React.Fragment key={child.id}>
-            {/* Insert button between siblings */}
-            {i > 0 && (
-              <InlineInsertButton parentId={agent.id} insertIndex={i} onAddAgent={onAddAgent} />
-            )}
-            <div data-tree-col className="flex flex-col items-center" style={{ minWidth: 230 }}>
-              <div className="h-6 pointer-events-none" style={{ width: 2, background: 'rgba(255,255,255,0.5)' }} />
-              <CanvasTreeNode
-                agent={child}
-                agents={agents}
-                getChildren={getChildren}
-                onClickAgent={onClickAgent}
-                onToggleAgent={onToggleAgent}
-                addingChildFor={addingChildFor}
-                setAddingChildFor={setAddingChildFor}
-                onAddAgent={onAddAgent}
-              />
-            </div>
-          </React.Fragment>
+        {/* Each child column */}
+        {children.map((child) => (
+          <div key={child.id} data-tree-col className="flex flex-col items-center" style={{ minWidth: 230 }}>
+            {/* Vertical drop line */}
+            <div className="h-6 pointer-events-none" style={{ width: 2, background: 'rgba(255,255,255,0.5)' }} />
+            <CanvasTreeNode
+              agent={child}
+              agents={agents}
+              getChildren={getChildren}
+              onClickAgent={onClickAgent}
+              onToggleAgent={onToggleAgent}
+              onAddAgent={onAddAgent}
+            />
+          </div>
         ))}
 
-        {/* Add button at the end */}
-        <div data-tree-col className="flex flex-col items-center" style={{ minWidth: 160 }}>
+        {/* "+" add button at end */}
+        <div data-tree-col className="flex flex-col items-center" style={{ minWidth: 140 }}>
           <div className="h-6 pointer-events-none" style={{ width: 2, background: 'rgba(255,255,255,0.5)' }} />
-          {addButton}
+          <button
+            onClick={(e) => { e.stopPropagation(); onAddAgent(agent.id, 'avaliador'); }}
+            className="px-4 py-3 rounded-2xl border-2 border-dashed border-border/40 hover:border-primary/40 hover:bg-primary/5 transition-all flex flex-col items-center gap-1.5"
+            data-agent-node
+          >
+            <div className="w-7 h-7 rounded-lg bg-muted/80 flex items-center justify-center">
+              <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+            </div>
+            <span className="text-[9px] text-muted-foreground font-medium">Adicionar Agente</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1544,8 +1515,6 @@ Avalie cada critério abaixo e retorne APENAS JSON válido (sem markdown):
                       getChildren={getChildren}
                       onClickAgent={setEditingAgentId}
                       onToggleAgent={handleToggleAgent}
-                      addingChildFor={addingChildFor}
-                      setAddingChildFor={setAddingChildFor}
                       onAddAgent={handleAddAgent}
                     />
                   )}
@@ -1727,8 +1696,6 @@ Avalie cada critério abaixo e retorne APENAS JSON válido (sem markdown):
                       getChildren={getChildren}
                       onClickAgent={setEditingAgentId}
                       onToggleAgent={handleToggleAgent}
-                      addingChildFor={addingChildFor}
-                      setAddingChildFor={setAddingChildFor}
                       onAddAgent={handleAddAgent}
                     />
                   )}
