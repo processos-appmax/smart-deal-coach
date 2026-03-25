@@ -25,6 +25,8 @@ import {
   updateUserRole,
   removeAllowedUser,
   resetUserPassword,
+  getAllowedUserByEmail,
+  hashPasswordForLogin,
   type AllowedUser,
 } from '@/lib/accessControl';
 
@@ -419,7 +421,188 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── My Profile View (for non-admin roles) ──────────────────────────────────
+function MyProfileView() {
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
+  const { instances } = useEvolutionInstances();
+  const [currentPass, setCurrentPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const email = currentUser?.email?.toLowerCase() || '';
+  const assignedInst = instances.find(i => i.assignedUserEmail?.toLowerCase() === email);
+
+  const handleChangePassword = async () => {
+    if (!currentPass.trim()) {
+      toast({ variant: 'destructive', title: 'Informe a senha atual' });
+      return;
+    }
+    if (newPass.length < 8) {
+      toast({ variant: 'destructive', title: 'Senha fraca', description: 'A nova senha deve ter pelo menos 8 caracteres.' });
+      return;
+    }
+    if (newPass !== confirmPass) {
+      toast({ variant: 'destructive', title: 'Senhas não conferem', description: 'A confirmação não coincide com a nova senha.' });
+      return;
+    }
+    setSaving(true);
+    try {
+      // Verify current password
+      const hashed = await hashPasswordForLogin(currentPass);
+      const match = await getAllowedUserByEmail(email);
+      if (!match || (match.password !== hashed && match.password !== currentPass)) {
+        toast({ variant: 'destructive', title: 'Senha atual incorreta' });
+        return;
+      }
+      await resetUserPassword(email, newPass);
+      setCurrentPass('');
+      setNewPass('');
+      setConfirmPass('');
+      toast({ title: 'Senha alterada com sucesso!' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="page-container animate-fade-in max-w-xl mx-auto">
+      <h1 className="text-2xl font-display font-bold mb-1">Meu Perfil</h1>
+      <p className="text-sm text-muted-foreground mb-6">Informações da sua conta</p>
+
+      {/* Basic info */}
+      <div className="glass-card p-5 rounded-xl space-y-4 mb-6">
+        <div className="flex items-center gap-4">
+          <img
+            src={currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`}
+            alt={currentUser?.name}
+            className="w-14 h-14 rounded-full border-2 border-border"
+          />
+          <div>
+            <p className="text-base font-semibold">{currentUser?.name}</p>
+            <p className="text-sm text-muted-foreground">{email}</p>
+            <span className={cn('text-[10px] px-2 py-0.5 rounded-full border font-medium mt-1 inline-block',
+              ROLE_CONFIG[currentUser?.role || 'member'].class
+            )}>
+              {ROLE_CONFIG[currentUser?.role || 'member'].label}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* WhatsApp Instance */}
+      <div className="glass-card p-5 rounded-xl mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Smartphone className="w-4 h-4 text-accent" />
+          <h3 className="text-sm font-semibold">Instância WhatsApp</h3>
+        </div>
+        {assignedInst ? (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary border border-border">
+            <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0',
+              assignedInst.connectionStatus === 'open' ? 'bg-success' : 'bg-muted-foreground')} />
+            <div>
+              <p className="text-sm font-medium">{assignedInst.profileName || assignedInst.name}</p>
+              <p className="text-[11px] text-muted-foreground font-mono">
+                {assignedInst.ownerJid?.replace('@s.whatsapp.net', '') || '—'}
+              </p>
+            </div>
+            <span className={cn('ml-auto text-[10px] px-2 py-0.5 rounded-full border font-medium',
+              assignedInst.connectionStatus === 'open'
+                ? 'bg-success/10 text-success border-success/20'
+                : 'bg-muted text-muted-foreground border-border'
+            )}>
+              {assignedInst.connectionStatus === 'open' ? 'Conectada' : 'Desconectada'}
+            </span>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Nenhuma instância atribuída. Fale com seu gestor.</p>
+        )}
+      </div>
+
+      {/* Change password */}
+      <div className="glass-card p-5 rounded-xl">
+        <div className="flex items-center gap-2 mb-4">
+          <KeyRound className="w-4 h-4 text-warning" />
+          <h3 className="text-sm font-semibold">Alterar Senha</h3>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium block mb-1.5">Senha atual</label>
+            <div className="relative">
+              <Input
+                type={showCurrent ? 'text' : 'password'}
+                value={currentPass}
+                onChange={e => setCurrentPass(e.target.value)}
+                className="h-9 text-sm bg-secondary border-border pr-9"
+                placeholder="Digite sua senha atual"
+              />
+              <button onClick={() => setShowCurrent(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                {showCurrent ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1.5">Nova senha</label>
+            <div className="relative">
+              <Input
+                type={showNew ? 'text' : 'password'}
+                value={newPass}
+                onChange={e => setNewPass(e.target.value)}
+                className="h-9 text-sm bg-secondary border-border pr-9"
+                placeholder="Mínimo 8 caracteres"
+              />
+              <button onClick={() => setShowNew(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                {showNew ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1.5">Confirmar nova senha</label>
+            <Input
+              type="password"
+              value={confirmPass}
+              onChange={e => setConfirmPass(e.target.value)}
+              className="h-9 text-sm bg-secondary border-border"
+              placeholder="Repita a nova senha"
+            />
+            {confirmPass && newPass !== confirmPass && (
+              <p className="text-[10px] text-destructive mt-1 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> Senhas não conferem
+              </p>
+            )}
+          </div>
+          <Button
+            size="sm"
+            className="w-full h-9 text-xs bg-gradient-primary mt-2"
+            onClick={handleChangePassword}
+            disabled={saving || !currentPass || !newPass || !confirmPass}
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-1.5" />}
+            Alterar Senha
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function UsersPage() {
+  const { user: currentUser, hasMinRole } = useAuth();
+
+  // Non-admin users see only their own profile
+  if (!hasMinRole('supervisor')) {
+    return <MyProfileView />;
+  }
+
+  return <UsersAdminPage />;
+}
+
+function UsersAdminPage() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const { instances } = useEvolutionInstances();
