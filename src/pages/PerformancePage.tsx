@@ -284,7 +284,7 @@ export default function PerformancePage() {
                 className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                   mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
                 {m === 'person' ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
-                {m === 'person' ? 'Vendedor' : 'Time'}
+                {m === 'person' ? 'Analista' : 'Time'}
               </button>
             ))}
           </div>
@@ -304,7 +304,7 @@ export default function PerformancePage() {
                 className="text-xs bg-secondary border border-border rounded-lg pl-3 pr-7 h-9 text-foreground outline-none focus:border-primary/50 cursor-pointer appearance-none min-w-[200px]">
                 {visibleUsers.map(u => (
                   <option key={u.id} value={u.id}>
-                    {u.name} — {u.role === 'member' ? 'Vendedor' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'director' ? 'Diretor' : u.role}
+                    {u.name} — {u.role === 'member' ? 'Analista' : u.role === 'supervisor' ? 'Supervisor' : u.role === 'director' ? 'Diretor' : u.role}
                   </option>
                 ))}
               </select>

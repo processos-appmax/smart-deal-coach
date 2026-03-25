@@ -37,7 +37,7 @@ const ROLE_CONFIG: Record<UserRole, { label: string; class: string }> = {
   manager:     { label: 'Gerente',      class: 'bg-accent/15 text-accent border-accent/30' },
   coordinator: { label: 'Coordenador',  class: 'bg-warning/10 text-warning border-warning/20' },
   supervisor:  { label: 'Supervisor',   class: 'bg-success/10 text-success border-success/20' },
-  member:      { label: 'Vendedor',     class: 'bg-muted text-muted-foreground border-border' },
+  member:      { label: 'Analista',     class: 'bg-muted text-muted-foreground border-border' },
 };
 
 // ─── Create user modal ────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ function CreateUserModal({ onClose, onCreate }: { onClose: () => void; onCreate:
             <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
               <SelectTrigger className="h-9 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-card border-border">
-                <SelectItem value="member"      className="text-xs">Vendedor</SelectItem>
+                <SelectItem value="member"      className="text-xs">Analista</SelectItem>
                 <SelectItem value="supervisor"  className="text-xs">Supervisor</SelectItem>
                 <SelectItem value="coordinator" className="text-xs">Coordenador</SelectItem>
                 <SelectItem value="manager"     className="text-xs">Gerente</SelectItem>
@@ -140,7 +140,7 @@ function ChangeRoleModal({ user, onClose, onSave }: { user: User; onClose: () =>
             <Select value={role} onValueChange={v => setRole(v as UserRole)}>
               <SelectTrigger className="h-9 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-card border-border">
-                <SelectItem value="member"      className="text-xs">Vendedor — acesso básico</SelectItem>
+                <SelectItem value="member"      className="text-xs">Analista — acesso básico</SelectItem>
                 <SelectItem value="supervisor"  className="text-xs">Supervisor — vê seu time</SelectItem>
                 <SelectItem value="coordinator" className="text-xs">Coordenador — vê sua área</SelectItem>
                 <SelectItem value="manager"     className="text-xs">Gerente — gestão de área</SelectItem>
@@ -592,14 +592,19 @@ function MyProfileView() {
 }
 
 export default function UsersPage() {
-  const { user: currentUser, hasMinRole } = useAuth();
+  const { hasMinRole } = useAuth();
+  const isManager = hasMinRole('supervisor');
 
-  // Non-admin users see only their own profile
-  if (!hasMinRole('supervisor')) {
-    return <MyProfileView />;
-  }
-
-  return <UsersAdminPage />;
+  return (
+    <div>
+      <MyProfileView />
+      {isManager && (
+        <div className="mt-8">
+          <UsersAdminPage />
+        </div>
+      )}
+    </div>
+  );
 }
 
 function UsersAdminPage() {
@@ -717,7 +722,7 @@ function UsersAdminPage() {
             <button key={r} onClick={() => setRoleFilter(r)}
               className={cn('text-xs px-3 py-1.5 rounded-lg border transition-all',
                 roleFilter === r ? 'bg-primary/15 border-primary/30 text-primary' : 'border-border text-muted-foreground hover:bg-muted')}>
-              {{ all: 'Todos', admin: 'Admin', director: 'Diretores', supervisor: 'Supervisores', member: 'Vendedores' }[r]}
+              {{ all: 'Todos', admin: 'Admin', director: 'Diretores', supervisor: 'Supervisores', member: 'Analistas' }[r]}
             </button>
           ))}
         </div>

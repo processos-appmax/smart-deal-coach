@@ -21,7 +21,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   manager:     'Gerente',
   coordinator: 'Coordenador',
   supervisor:  'Supervisor',
-  member:      'Vendedor',
+  member:      'Analista',
 };
 
 // Resources that can be toggled per role
