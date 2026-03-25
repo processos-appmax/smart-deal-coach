@@ -155,20 +155,11 @@ export default function AppSidebar({ collapsed, onToggle }: { collapsed: boolean
                 <button
                   onClick={() => {
                     setProfileOpen(false);
-                    navigate('/me');
+                    navigate('/users');
                   }}
                   className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
                 >
                   <User className="w-3 h-3" /> Meu Perfil
-                </button>
-                <button
-                  onClick={() => {
-                    setProfileOpen(false);
-                    navigate(canAccess('admin') ? '/admin' : '/users');
-                  }}
-                  className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
-                >
-                  <Building2 className="w-3 h-3" /> {roleLabel}
                 </button>
                 <div className="h-px bg-sidebar-border mx-2 my-1" />
               </>

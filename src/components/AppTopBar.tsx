@@ -108,7 +108,7 @@ export default function AppTopBar() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onClick={() => navigate('/me')}>Meu perfil</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/users')}>Meu perfil</DropdownMenuItem>
             {canAccess('admin') && (
               <DropdownMenuItem onClick={() => navigate('/admin')}>Administrador</DropdownMenuItem>
             )}
