@@ -495,6 +495,127 @@ function MethodologySelector({
   );
 }
 
+// ─── Methodology Inline Selector (inside AgentConfigModal) ──────────────────
+function MethodologyInlineSelector({
+  onApply,
+}: {
+  onApply: (preset: MethodologyPreset) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [confirmPreset, setConfirmPreset] = useState<MethodologyPreset | null>(null);
+
+  const presets = METHODOLOGY_PRESETS;
+
+  const tierLabel = (tier: string) => {
+    if (tier === 'core') return { text: 'Core', cls: 'bg-primary/10 text-primary border-primary/20' };
+    if (tier === 'complementary') return { text: 'Complementar', cls: 'bg-accent/10 text-accent border-accent/20' };
+    return { text: 'Opcional', cls: 'bg-muted text-muted-foreground border-border' };
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-secondary/30">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between px-4 py-3"
+      >
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-3.5 h-3.5 text-accent" />
+          <span className="text-xs font-semibold">Metodologia de Vendas</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 font-medium">
+            {presets.length} presets
+          </span>
+        </div>
+        {expanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3">
+          <p className="text-[10px] text-muted-foreground">
+            Selecionar uma metodologia <span className="text-warning font-semibold">substituirá</span> o prompt e critérios acima. Você pode editá-los depois.
+          </p>
+
+          {(['core', 'complementary', 'optional'] as const).map(tier => {
+            const tierPresets = presets.filter(p => p.tier === tier);
+            const labels = { core: 'Core', complementary: 'Complementares', optional: 'Opcionais' };
+            return (
+              <div key={tier}>
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{labels[tier]}</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {tierPresets.map(p => {
+                    const tl = tierLabel(p.tier);
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => setConfirmPreset(p)}
+                        className="text-left p-2.5 rounded-lg border border-border bg-background hover:border-primary/40 hover:bg-primary/5 transition-all"
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-sm">{p.icon}</span>
+                          <span className="text-[11px] font-semibold truncate">{p.name}</span>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground line-clamp-1">{p.description}</p>
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <span className={cn('text-[8px] px-1 py-0.5 rounded-full border font-medium', tl.cls)}>{tl.text}</span>
+                          <span className="text-[8px] text-muted-foreground/60">{p.criteria.length} critérios</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Confirmation mini-modal */}
+      {confirmPreset && (
+        <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setConfirmPreset(null)}>
+          <div className="w-full max-w-sm glass-card p-4 rounded-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">{confirmPreset.icon}</span>
+              <div>
+                <h4 className="text-sm font-semibold">{confirmPreset.name}</h4>
+                <p className="text-[10px] text-muted-foreground">{confirmPreset.creator}</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-2">{confirmPreset.description}</p>
+
+            <div className="mb-2">
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Critérios</p>
+              <div className="space-y-0.5 max-h-32 overflow-y-auto">
+                {confirmPreset.criteria.map(c => (
+                  <div key={c.id} className="flex justify-between text-[10px] px-2 py-0.5 rounded bg-secondary/50">
+                    <span className="truncate">{c.label}</span>
+                    <span className="font-semibold text-primary flex-shrink-0 ml-2">{c.weight}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-2 rounded-lg bg-warning/5 border border-warning/20 mb-3">
+              <p className="text-[10px] text-warning">
+                <AlertTriangle className="w-3 h-3 inline mr-1" />
+                Isso substituirá o prompt e critérios atuais deste avaliador. Você pode editá-los depois.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button size="sm" className="flex-1 bg-gradient-primary text-xs h-8"
+                onClick={() => { onApply(confirmPreset); setConfirmPreset(null); setExpanded(false); }}>
+                <Zap className="w-3 h-3 mr-1" /> Aplicar
+              </Button>
+              <Button size="sm" variant="outline" className="text-xs border-border h-8" onClick={() => setConfirmPreset(null)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
     const s = localStorage.getItem(key);
@@ -595,6 +716,7 @@ function AgentConfigModal({
   onDeleteFile: (f: AgentFile) => void;
   uploadingFile: boolean;
 }) {
+  const { toast } = useToast();
   const [form, setForm] = useState<AgentNode>(agent);
   const [editingCrit, setEditingCrit] = useState<EvalCriteria | null>(null);
   const [addingCrit, setAddingCrit] = useState(false);
@@ -688,6 +810,22 @@ function AgentConfigModal({
             <Textarea value={form.prompt_sistema} onChange={e => update({ prompt_sistema: e.target.value })}
               className="text-sm bg-secondary border-border min-h-[120px] resize-none" />
           </div>
+
+          {/* Methodology Preset (avaliador only) */}
+          {form.tipo === 'avaliador' && (
+            <MethodologyInlineSelector
+              onApply={(preset) => {
+                update({
+                  prompt_sistema: preset.systemPrompt,
+                  criterios: preset.criteria,
+                });
+                toast({
+                  title: `${preset.icon} ${preset.name} aplicada!`,
+                  description: `Prompt e ${preset.criteria.length} critérios preenchidos. Edite se necessário.`,
+                });
+              }}
+            />
+          )}
 
           {/* Criteria (avaliador + sentimental) */}
           {(form.tipo === 'avaliador' || form.tipo === 'sentimental') && (
