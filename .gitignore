@@ -1,52 +1,53 @@
-# Scripts with credentials (never commit)
-scripts/fetch-transcripts.mjs
-
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Environment & Secrets (AIOX)
+# ─── Secrets ──────────────────────────────────────────────────────────────────
 .env
 .env.local
 .env.*.local
 *.key
 *.pem
+scripts/fetch-transcripts.mjs
 
-# Dependencies (AIOX)
+# ─── Dependencies ─────────────────────────────────────────────────────────────
 node_modules/
-
-# Build & Logs (AIOX)
-dist/
-build/
-logs/
-
-# IDE & OS (AIOX)
-Thumbs.db
-.idea/
-*.swp
-
-# AIOX Local (AIOX)
 .aiox-core/local/
+.aiox-core/node_modules/
+
+# ─── Build output ─────────────────────────────────────────────────────────────
+dist/
+dist-ssr/
+build/
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ─── IDE & OS ─────────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.local
+
+# ─── IDE agent configs (only .claude/ is authoritative) ──────────────────────
+.cursor/
+.codex/
+.gemini/
+.antigravity/
+
+# ─── Bun (npm is primary) ────────────────────────────────────────────────────
+bun.lock
+bun.lockb
+
+# ─── Supabase temp ────────────────────────────────────────────────────────────
+supabase/.temp/
+
+# ─── AIOX local state ────────────────────────────────────────────────────────
 .claude/settings.local.json
 .aiox/install-log.txt

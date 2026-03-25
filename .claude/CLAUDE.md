@@ -353,4 +353,80 @@ npm run trace -- workflow-name
 - Document breaking changes prominently
 
 ---
-*Synkra AIOX Claude Code Configuration v2.0*
+
+## Smart Deal Coach — Instruções do Projeto
+
+### Sobre o Projeto
+SaaS de coaching de vendas com IA para a Appmax. Avalia reuniões (Google Meet) e conversas WhatsApp usando hierarquia multi-agente com metodologias de vendas (Sandler, SPIN, MEDDIC, SPICED, Challenger, etc.).
+
+### Stack Técnico
+- **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui
+- **Backend:** Supabase (PostgreSQL, Edge Functions, Storage, RLS)
+- **Schema:** `saas.*` (multi-tenant por `empresa_id`)
+- **WhatsApp:** Evolution API (Baileys)
+- **IA:** OpenAI (gpt-4o-mini) via proxy RPC
+- **Deploy:** Lovable (push to main = auto-deploy)
+
+### Estrutura de Pastas
+```
+src/
+├── pages/          # 17 páginas (Dashboard, Meetings, WhatsApp, AIConfig, etc.)
+├── components/     # Layout + shadcn/ui
+├── contexts/       # Auth, AppConfig, RolePermissions, AuditLog
+├── hooks/          # useEvolutionInstances, useToast, etc.
+├── lib/            # Services (meetingsService, agentService, accessControl, etc.)
+├── types/          # Interfaces TypeScript
+└── integrations/   # Supabase client
+services/
+└── meet-collector/ # Backend Node.js para coletar transcrições do Meet
+squads/
+└── framework/      # Squad de metodologias de vendas (12 agentes)
+supabase/
+├── functions/      # Edge Functions (evaluate-cron, meet-gateway, etc.)
+└── migrations/     # 14 migrations SQL
+docs/               # Documentação (banco, evolution-api, meet)
+```
+
+### Convenções
+- **Idioma do código:** Inglês (nomes de variáveis, funções, componentes)
+- **Idioma do conteúdo:** Português (labels, mensagens, prompts de IA)
+- **Schema DB:** Português (tabelas: `reunioes`, `usuarios`, `instancias_whatsapp`)
+- **Commits:** Conventional commits em português (`feat:`, `fix:`, `chore:`)
+- **Imports:** Absolute com `@/` (ex: `@/lib/config`)
+
+### Hierarquia de Cargos (escopo de visibilidade)
+| Cargo | Escopo | Vê |
+|-------|--------|-----|
+| admin/ceo/director | `all` | Tudo da empresa |
+| manager/coordinator | `area` | Dados da sua área |
+| supervisor | `team` | Dados do seu time |
+| member (Analista) | `self` | Apenas seus dados |
+
+### Tabelas Principais (schema: saas)
+- `empresas` — multi-tenant
+- `usuarios` — com `area_id`, `time_id`, `papel`
+- `areas` / `times` — hierarquia organizacional
+- `reunioes` — reuniões Google Meet com transcrição
+- `instancias_whatsapp` — instâncias Evolution API
+- `conversas_whatsapp` / `mensagens_whatsapp`
+- `agentes_ia` — hierarquia multi-agente (gerente→classificador→avaliador)
+- `analises_ia` — resultados de avaliação IA
+- `configuracoes_ia` — critérios e prompts por módulo
+- `tokens_ia_modulo` — chaves OpenAI por módulo
+
+### Comandos Úteis
+```bash
+npm run dev          # Dev server (Vite)
+npm run build        # Build para produção
+npm run lint         # ESLint
+npm test             # Vitest
+```
+
+### Regras de Segurança
+- **NUNCA commitar `.env`** (contém credenciais reais)
+- **Usar `.env.example`** como template
+- **RLS ativo** em todas as tabelas do Supabase
+- **Tokens OpenAI** criptografados no campo `token_criptografado`
+
+---
+*Synkra AIOX Claude Code Configuration v2.0 + Smart Deal Coach Project Config*
