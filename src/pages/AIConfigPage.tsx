@@ -1054,29 +1054,26 @@ function CanvasTreeNode({
       {/* "+" connector between parent and children */}
       <ConnectorWithAdd parentId={agent.id} onInsertBetween={onInsertBetween} height={40} />
 
-      {/* Children */}
+      {/* Children row — each child has a two-half connector that forms the horizontal bar + vertical drops */}
       <div className="flex items-start">
         {children.map((child, i) => {
           const isFirst = i === 0;
           const isLast = i === children.length - 1;
+          const isOnly = children.length === 1;
           return (
             <div key={child.id} className="flex flex-col items-center" style={{ minWidth: 230 }}>
-              {/*
-               * Proven CSS org-chart connector: two flex halves.
-               * - borderRight on left-half = vertical drop (centered since both halves are flex:1)
-               * - borderTop on left-half  = horizontal line to left sibling
-               * - borderTop on right-half = horizontal line to right sibling
-               */}
-              <div className="flex self-stretch" style={{ height: 20 }}>
+              {/* Two halves form the connector:
+                  Left half:  borderRight = vertical drop (centered), borderTop = bar to left sibling
+                  Right half: borderTop = bar to right sibling */}
+              <div className="flex self-stretch" style={{ height: 24 }}>
                 <div className="flex-1" style={{
                   borderRight: border,
-                  borderTop: isFirst ? 'none' : border,
+                  borderTop: (isFirst || isOnly) ? 'none' : border,
                 }} />
                 <div className="flex-1" style={{
-                  borderTop: isLast ? 'none' : border,
+                  borderTop: (isLast || isOnly) ? 'none' : border,
                 }} />
               </div>
-              {/* Recurse */}
               <CanvasTreeNode
                 agent={child}
                 agents={agents}
@@ -1089,7 +1086,7 @@ function CanvasTreeNode({
             </div>
           );
         })}
-        {/* Add sibling — no connector lines */}
+        {/* Add sibling */}
         <AddSiblingButton parentId={agent.id} onAddAgent={onAddAgent} />
       </div>
     </div>
