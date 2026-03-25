@@ -976,18 +976,23 @@ function CanvasTreeNode({
   const rowRef = useRef<HTMLDivElement>(null);
   const [hBar, setHBar] = useState<{ left: number; width: number } | null>(null);
 
-  // Measure horizontal bar position after render
+  // Measure horizontal bar using offsetLeft (immune to CSS transform/zoom)
   useEffect(() => {
-    if (!rowRef.current || colCount <= 1) { setHBar(null); return; }
-    const row = rowRef.current;
-    const cols = row.querySelectorAll<HTMLElement>('[data-tree-col]');
-    if (cols.length < 2) { setHBar(null); return; }
-    const rowRect = row.getBoundingClientRect();
-    const first = cols[0].getBoundingClientRect();
-    const last = cols[cols.length - 1].getBoundingClientRect();
-    const left = (first.left + first.width / 2) - rowRect.left;
-    const right = (last.left + last.width / 2) - rowRect.left;
-    setHBar({ left, width: right - left });
+    const measure = () => {
+      if (!rowRef.current || colCount <= 1) { setHBar(null); return; }
+      const cols = rowRef.current.querySelectorAll<HTMLElement>('[data-tree-col]');
+      if (cols.length < 2) { setHBar(null); return; }
+      const first = cols[0];
+      const last = cols[cols.length - 1];
+      const l = first.offsetLeft + first.offsetWidth / 2;
+      const r = last.offsetLeft + last.offsetWidth / 2;
+      setHBar({ left: l, width: r - l });
+    };
+    measure();
+    // Remeasure on resize
+    const ro = new ResizeObserver(measure);
+    if (rowRef.current) ro.observe(rowRef.current);
+    return () => ro.disconnect();
   }, [colCount, columns.length]);
 
   return (
@@ -998,15 +1003,15 @@ function CanvasTreeNode({
       </div>
 
       {/* Vertical stem down from parent */}
-      <div className="h-8 bg-white/70 pointer-events-none" style={{ width: 1.5 }} />
+      <div className="h-8 pointer-events-none" style={{ width: 2, background: 'rgba(255,255,255,0.5)' }} />
 
       {/* Children row with horizontal connector */}
       <div ref={rowRef} className="relative flex items-start gap-6">
-        {/* Horizontal connector bar — measured from actual child centers */}
+        {/* Horizontal connector bar — pixel-perfect via offsetLeft */}
         {hBar && (
           <div
-            className="absolute top-0 bg-white/70 pointer-events-none"
-            style={{ left: hBar.left, width: hBar.width, height: 1.5 }}
+            className="absolute top-0 pointer-events-none"
+            style={{ left: hBar.left, width: Math.max(hBar.width, 1), height: 2, background: 'rgba(255,255,255,0.5)' }}
           />
         )}
 
@@ -1014,7 +1019,7 @@ function CanvasTreeNode({
         {columns.map((col) => (
           <div key={col.child?.id ?? 'add'} data-tree-col className="flex flex-col items-center" style={{ minWidth: 230 }}>
             {/* Vertical drop from horizontal bar to child */}
-            <div className="h-6 bg-white/70 pointer-events-none" style={{ width: 1.5 }} />
+            <div className="h-6 pointer-events-none" style={{ width: 2, background: 'rgba(255,255,255,0.5)' }} />
 
             {col.type === 'child' && col.child ? (
               <CanvasTreeNode
