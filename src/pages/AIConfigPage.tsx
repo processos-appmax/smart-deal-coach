@@ -1020,7 +1020,6 @@ function CanvasTreeNode({
   onClickAgent,
   onToggleAgent,
   onAddAgent,
-  onInsertBetween,
 }: {
   agent: AgentNode;
   agents: AgentNode[];
@@ -1028,7 +1027,6 @@ function CanvasTreeNode({
   onClickAgent: (id: string) => void;
   onToggleAgent: (a: AgentNode) => void;
   onAddAgent: (parentId: string, tipo: AgentTipo, insertIndex?: number) => void;
-  onInsertBetween: (parentId: string, tipo: AgentTipo) => void;
 }) {
   const children = getChildren(agent.id);
   const border = '2px solid rgba(255,255,255,0.4)';
@@ -1051,8 +1049,8 @@ function CanvasTreeNode({
         <AgentNode_ agent={agent} onClick={() => onClickAgent(agent.id)} onToggle={() => onToggleAgent(agent)} />
       </div>
 
-      {/* "+" connector between parent and children */}
-      <ConnectorWithAdd parentId={agent.id} onInsertBetween={onInsertBetween} height={40} />
+      {/* Vertical stem down from parent to children */}
+      <div style={{ width: 2, height: 32, background: 'rgba(255,255,255,0.4)' }} />
 
       {/* Children row — each child has a two-half connector that forms the horizontal bar + vertical drops */}
       <div className="flex items-start">
@@ -1081,7 +1079,6 @@ function CanvasTreeNode({
                 onClickAgent={onClickAgent}
                 onToggleAgent={onToggleAgent}
                 onAddAgent={onAddAgent}
-                onInsertBetween={onInsertBetween}
               />
             </div>
           );
@@ -1584,7 +1581,6 @@ Avalie cada critério abaixo e retorne APENAS JSON válido (sem markdown):
                       onClickAgent={setEditingAgentId}
                       onToggleAgent={handleToggleAgent}
                       onAddAgent={handleAddAgent}
-                      onInsertBetween={handleInsertBetween}
                     />
                   )}
                 </div>
@@ -1766,7 +1762,6 @@ Avalie cada critério abaixo e retorne APENAS JSON válido (sem markdown):
                       onClickAgent={setEditingAgentId}
                       onToggleAgent={handleToggleAgent}
                       onAddAgent={handleAddAgent}
-                      onInsertBetween={handleInsertBetween}
                     />
                   )}
                 </div>
