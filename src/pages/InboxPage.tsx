@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Inbox, Search, MessageSquare, Settings, Send, CheckCheck, Plus,
   Loader2, RefreshCw, ChevronRight, Phone, Clock, Check,
-  Paperclip, Image as ImageIcon, FileText, Mic, LayoutTemplate,
-  AlertTriangle, X, UserPlus, Trash2,
+  Paperclip, Image as ImageIcon, FileText, Mic, MicOff, LayoutTemplate,
+  AlertTriangle, X, UserPlus, Trash2, RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -437,6 +437,9 @@ export default function InboxPage() {
 
   // ── Send template ──────────────────────────────────────
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [templatesList, setTemplatesList] = useState<any[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
@@ -480,6 +483,84 @@ export default function InboxPage() {
   };
 
   // ── Start new conversation ─────────────────────────────
+  // ── Retry failed message ────────────────────────────────
+  const handleRetry = async (msg: InboxMessage) => {
+    if (!selectedAccount || !selectedConv) return;
+    setSending(true);
+    try {
+      let result: { success: boolean; error?: string };
+      if (msg.msg_type === 'template' && msg.template_name) {
+        result = await sendTemplateMessage(
+          selectedAccount, selectedConv.id, selectedConv.contact_phone,
+          msg.template_name, msg.template_language || 'pt_BR',
+          msg.template_components ? JSON.parse(msg.template_components as any) : undefined,
+          msg.body || undefined,
+        );
+      } else {
+        result = await sendTextMessage(selectedAccount, selectedConv.id, selectedConv.contact_phone, msg.body || '');
+      }
+      if (result.success) {
+        // Delete the failed message
+        await (supabase as any).from('meta_inbox_messages').delete().eq('id', msg.id);
+        const data = await loadMessages(selectedConv.id);
+        setMessages(data);
+        toast({ title: 'Mensagem reenviada!' });
+      } else {
+        toast({ variant: 'destructive', title: 'Erro ao reenviar', description: result.error });
+      }
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
+    }
+    setSending(false);
+  };
+
+  // ── Audio recording ────────────────────────────────────
+  const startRecording = async () => {
+    if (!selectedAccount || !selectedConv) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (blob.size < 100) return;
+        setSending(true);
+        try {
+          const file = new File([blob], 'audio.webm', { type: 'audio/webm' });
+          const upload = await uploadMediaToMeta(selectedAccount!, file);
+          if (upload.error || !upload.mediaId) throw new Error(upload.error || 'Upload falhou');
+          const result = await sendMediaMessage(
+            selectedAccount!, selectedConv!.id, selectedConv!.contact_phone,
+            'audio', upload.mediaId,
+          );
+          if (result.success) {
+            const data = await loadMessages(selectedConv!.id);
+            setMessages(data);
+          } else {
+            toast({ variant: 'destructive', title: 'Erro ao enviar áudio', description: result.error });
+          }
+        } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Erro', description: e.message });
+        }
+        setSending(false);
+      };
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setRecording(true);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao acessar microfone', description: e.message });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setRecording(false);
+  };
+
   // ── Delete conversation ─────────────────────────────────
   const handleDeleteConversation = async (conv: InboxConversation) => {
     try {
@@ -692,9 +773,21 @@ export default function InboxPage() {
                   )}>
                     <p className="leading-relaxed whitespace-pre-wrap">{msg.body}</p>
                     {msg.error_message && (
-                      <p className="text-[9px] text-destructive mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-2.5 h-2.5" /> {msg.error_message}
-                      </p>
+                      <div className="mt-1">
+                        <p className="text-[9px] text-destructive flex items-center gap-1">
+                          <AlertTriangle className="w-2.5 h-2.5" /> {msg.error_message}
+                        </p>
+                        <button onClick={() => handleRetry(msg)}
+                          className="text-[9px] text-primary-foreground/80 hover:text-primary-foreground flex items-center gap-1 mt-0.5 underline">
+                          <RotateCcw className="w-2.5 h-2.5" /> Reenviar
+                        </button>
+                      </div>
+                    )}
+                    {msg.status === 'failed' && !msg.error_message && (
+                      <button onClick={() => handleRetry(msg)}
+                        className="text-[9px] text-primary-foreground/80 hover:text-primary-foreground flex items-center gap-1 mt-1 underline">
+                        <RotateCcw className="w-2.5 h-2.5" /> Reenviar
+                      </button>
                     )}
                     <div className={cn('flex items-center gap-1 mt-1', msg.from_me ? 'justify-end' : 'justify-start')}>
                       <span className="text-[10px] opacity-70">{formatTime(msg.timestamp)}</span>
@@ -727,16 +820,28 @@ export default function InboxPage() {
 
               {/* Text input */}
               <Input value={msgInput} onChange={e => setMsgInput(e.target.value)}
-                placeholder={within24h ? 'Escreva uma mensagem...' : 'Fora da janela 24h — use template'}
-                className="flex-1 h-9 text-sm bg-muted/40 border-border"
-                disabled={!within24h || sending}
+                placeholder={recording ? '🔴 Gravando áudio...' : within24h ? 'Escreva uma mensagem...' : 'Fora da janela 24h — use template'}
+                className={cn('flex-1 h-9 text-sm bg-muted/40 border-border', recording && 'border-destructive/50')}
+                disabled={!within24h || sending || recording}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText(); } }} />
 
-              {/* Send button */}
-              <Button size="icon" className="w-9 h-9 flex-shrink-0"
-                onClick={handleSendText} disabled={!msgInput.trim() || !within24h || sending}>
-                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </Button>
+              {/* Mic / Send button */}
+              {msgInput.trim() ? (
+                <Button size="icon" className="w-9 h-9 flex-shrink-0"
+                  onClick={handleSendText} disabled={!within24h || sending}>
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </Button>
+              ) : recording ? (
+                <Button size="icon" className="w-9 h-9 flex-shrink-0 bg-destructive hover:bg-destructive/90"
+                  onClick={stopRecording} title="Parar e enviar áudio">
+                  <Send className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button size="icon" variant="ghost" className="w-9 h-9 flex-shrink-0 text-muted-foreground"
+                  onClick={startRecording} disabled={!within24h || sending} title="Gravar áudio">
+                  <Mic className="w-4 h-4" />
+                </Button>
+              )}
             </div>
           </>
         )}
