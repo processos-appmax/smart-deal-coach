@@ -9,7 +9,7 @@ import {
   Settings, Plus, Trash2, Edit2, Save, X, Loader2,
   Check, AlertCircle, MessageSquare, Key, ExternalLink,
   Copy, CheckCheck, LayoutTemplate, ChevronDown, ChevronUp,
-  RefreshCw, Globe, Shield,
+  RefreshCw, Globe, Shield, RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -335,6 +335,93 @@ export default function InboxSettingsModal({ onClose, onSaved, accounts = [], on
     }
   };
 
+  const [recreatingId, setRecreatingId] = useState<string | null>(null);
+
+  const recreateTemplate = async (tmpl: MetaTemplate) => {
+    if (!selectedAccount?.waba_id || !selectedAccount?.access_token) return;
+    setRecreatingId(tmpl.id);
+    try {
+      const empresaId = (await import('@/lib/saas')).getSaasEmpresaId();
+
+      // Find current version from DB
+      const { data: existing } = await (supabase as any)
+        .from('meta_inbox_templates')
+        .select('version, display_name')
+        .eq('account_id', selectedAccount.id)
+        .eq('name', tmpl.name)
+        .maybeSingle();
+
+      const baseName = tmpl.name.replace(/_v\d+$/, ''); // strip _v2, _v3 etc
+      const displayName = existing?.display_name || baseName;
+      const nextVersion = (existing?.version || 1) + 1;
+      const newMetaName = `${baseName}_v${nextVersion}`;
+
+      // Build same components
+      const components = tmpl.components.map(c => {
+        const comp: any = { type: c.type };
+        if (c.format) comp.format = c.format;
+        if (c.text) comp.text = c.text;
+        if (c.buttons) comp.buttons = c.buttons;
+        return comp;
+      });
+
+      // Create in Meta with new name
+      const res = await fetch(`https://graph.facebook.com/v19.0/${selectedAccount.waba_id}/message_templates`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${selectedAccount.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newMetaName,
+          category: tmpl.category,
+          language: tmpl.language,
+          components,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const newTemplateId = data.id;
+
+      // Mark old version as inactive in local DB
+      await (supabase as any)
+        .from('meta_inbox_templates')
+        .update({ is_active: false })
+        .eq('account_id', selectedAccount.id)
+        .eq('name', tmpl.name);
+
+      // Save new version in local DB
+      await (supabase as any)
+        .from('meta_inbox_templates')
+        .upsert({
+          account_id: selectedAccount.id,
+          empresa_id: await empresaId,
+          meta_template_id: newTemplateId,
+          name: newMetaName,
+          display_name: displayName,
+          version: nextVersion,
+          is_active: true,
+          status: 'PENDING',
+          category: tmpl.category,
+          language: tmpl.language,
+          components: JSON.stringify(components),
+          synced_at: new Date().toISOString(),
+        }, { onConflict: 'account_id,meta_template_id' });
+
+      toast({ title: 'Template recriado!', description: `${displayName} v${nextVersion} (${newMetaName}) enviado para aprovação.` });
+      await fetchTemplates(selectedAccount);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao recriar template', description: e.message });
+    } finally {
+      setRecreatingId(null);
+    }
+  };
+
   const startEditTemplate = (t: MetaTemplate) => {
     const body = t.components.find(c => c.type === 'BODY')?.text || '';
     const header = t.components.find(c => c.type === 'HEADER')?.text || '';
@@ -648,6 +735,14 @@ export default function InboxSettingsModal({ onClose, onSaved, accounts = [], on
                           )}
                         </div>
                         <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost" size="icon" className="w-7 h-7 text-primary hover:text-primary"
+                            title="Recriar template (nova versão)"
+                            onClick={e => { e.stopPropagation(); recreateTemplate(t); }}
+                            disabled={recreatingId === t.id}
+                          >
+                            {recreatingId === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                          </Button>
                           <Button
                             variant="ghost" size="icon" className="w-7 h-7"
                             onClick={e => { e.stopPropagation(); startEditTemplate(t); }}
