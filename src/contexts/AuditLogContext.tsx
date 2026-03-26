@@ -81,8 +81,8 @@ export function AuditLogProvider({ children }: { children: React.ReactNode }) {
     const run = async () => {
       try {
         const empresaId = await getSaasEmpresaId();
-        const { data, error } = await supabaseSaas
-          .schema(\'saas\')
+        const { data, error } = await (supabaseSaas as any)
+          .schema('saas')
           .from('logs_auditoria')
           .select('id,usuario_id,tipo_evento,pagina,pagina_label,metadados,criado_em')
           .eq('empresa_id', empresaId)

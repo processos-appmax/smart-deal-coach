@@ -115,8 +115,8 @@ export function RolePermissionsProvider({ children }: { children: React.ReactNod
   useEffect(() => {
     const run = async () => {
       try {
-        const { data, error } = await supabaseSaas
-          .schema(\'saas\')
+        const { data, error } = await (supabaseSaas as any)
+          .schema('saas')
           .from('permissoes_papeis')
           .select('papel,recurso,escopo,permitido');
         if (error) throw error;
