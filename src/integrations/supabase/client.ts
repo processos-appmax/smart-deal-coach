@@ -17,3 +17,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+/**
+ * Untyped Supabase client for use with the 'saas' schema
+ * (tables not present in the generated types.ts)
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const supabaseSaas = supabase as any;
