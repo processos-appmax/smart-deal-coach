@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useCallback, useRef } from 'react';
 import type { UserRole } from '@/types';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseSaas, supabaseSaas } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ export function AuditLogProvider({ children }: { children: React.ReactNode }) {
             usuarioId = usr?.id ?? null;
           }
 
-          await supabase.schema('saas').from('logs_auditoria').insert({
+          await supabaseSaas.schema('saas').from('logs_auditoria').insert({
             empresa_id: empresaId,
             usuario_id: usuarioId,
             tipo_evento: entry.type,
@@ -161,7 +161,7 @@ export function AuditLogProvider({ children }: { children: React.ReactNode }) {
     void (async () => {
       try {
         const empresaId = await getSaasEmpresaId();
-        await supabase.schema('saas').from('logs_auditoria').delete().eq('empresa_id', empresaId);
+        await supabaseSaas.schema('saas').from('logs_auditoria').delete().eq('empresa_id', empresaId);
       } catch {
         // no-op
       }
