@@ -140,7 +140,7 @@ function mergeDefaults(users: AllowedUser[]): AllowedUser[] {
 
 export async function loadAllowedUsers(): Promise<AllowedUser[]> {
   const empresaId = await getSaasEmpresaId();
-  const { data, error } = await supabaseSaas
+  const { data, error } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .select('email,nome,papel,senha_hash,avatar_url,criado_em,status')
@@ -166,7 +166,7 @@ export async function upsertAllowedUser(user: AllowedUser): Promise<void> {
   const email = norm(user.email);
 
   // Check if user already exists
-  const { data: existing } = await supabaseSaas
+  const { data: existing } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .select('id')
@@ -184,7 +184,7 @@ export async function upsertAllowedUser(user: AllowedUser): Promise<void> {
     if (user.password) patch.senha_hash = await hashPassword(user.password);
     if (user.avatar !== undefined) patch.avatar_url = user.avatar || null;
 
-    const { error } = await supabaseSaas
+    const { error } = await (supabaseSaas as any)
       .schema('saas')
       .from('usuarios')
       .update(patch)
@@ -193,7 +193,7 @@ export async function upsertAllowedUser(user: AllowedUser): Promise<void> {
     if (error) throw error;
   } else {
     // INSERT new user
-    const { error } = await supabaseSaas
+    const { error } = await (supabaseSaas as any)
       .schema('saas')
       .from('usuarios')
       .insert({
@@ -212,7 +212,7 @@ export async function upsertAllowedUser(user: AllowedUser): Promise<void> {
 
 export async function updateUserRole(email: string, role: UserRole): Promise<void> {
   const empresaId = await getSaasEmpresaId();
-  const { error } = await supabaseSaas
+  const { error } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .update({ papel: roleToDb(role) })
@@ -228,7 +228,7 @@ export async function removeAllowedUser(email: string): Promise<boolean> {
   if (defaults.has(key)) return false;
 
   const empresaId = await getSaasEmpresaId();
-  const { error } = await supabaseSaas
+  const { error } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .update({ status: 'inativo' })
@@ -241,7 +241,7 @@ export async function removeAllowedUser(email: string): Promise<boolean> {
 
 export async function getPendingAccessRequests(): Promise<AccessRequest[]> {
   const empresaId = await getSaasEmpresaId();
-  const { data, error } = await supabaseSaas
+  const { data, error } = await (supabaseSaas as any)
     .schema('saas')
     .from('solicitacoes_acesso')
     .select('id,email,nome,foto_url,solicitado_em,status,decidido_em,papel_sugerido,decidido_por_usuario_id')
@@ -267,7 +267,7 @@ export async function createOrRefreshAccessRequest(payload: { email: string; nam
   const empresaId = await getSaasEmpresaId();
   const email = norm(payload.email);
 
-  const { data: existing, error: findErr } = await supabaseSaas
+  const { data: existing, error: findErr } = await (supabaseSaas as any)
     .schema('saas')
     .from('solicitacoes_acesso')
     .select('id')
@@ -279,7 +279,7 @@ export async function createOrRefreshAccessRequest(payload: { email: string; nam
   if (findErr) throw findErr;
 
   if (existing?.id) {
-    const { data: updated, error: updErr } = await supabaseSaas
+    const { data: updated, error: updErr } = await (supabaseSaas as any)
       .schema('saas')
       .from('solicitacoes_acesso')
       .update({ nome: payload.name || email.split('@')[0], foto_url: payload.picture || null, solicitado_em: new Date().toISOString() })
@@ -301,7 +301,7 @@ export async function createOrRefreshAccessRequest(payload: { email: string; nam
     };
   }
 
-  const { data: created, error: createErr } = await supabaseSaas
+  const { data: created, error: createErr } = await (supabaseSaas as any)
     .schema('saas')
     .from('solicitacoes_acesso')
     .insert({
@@ -330,7 +330,7 @@ export async function createOrRefreshAccessRequest(payload: { email: string; nam
 
 async function findApproverIdByEmail(email: string): Promise<string | null> {
   const empresaId = await getSaasEmpresaId();
-  const { data, error } = await supabaseSaas
+  const { data, error } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .select('id')
@@ -344,7 +344,7 @@ async function findApproverIdByEmail(email: string): Promise<string | null> {
 export async function approveAccessRequest(params: { requestId: string; approverEmail: string; role: UserRole }) {
   const approverId = await findApproverIdByEmail(params.approverEmail);
 
-  const { data: req, error: reqErr } = await supabaseSaas
+  const { data: req, error: reqErr } = await (supabaseSaas as any)
     .schema('saas')
     .from('solicitacoes_acesso')
     .select('id,empresa_id,email,nome,foto_url,status')
@@ -353,7 +353,7 @@ export async function approveAccessRequest(params: { requestId: string; approver
 
   if (reqErr || !req) return false;
 
-  const { error: updErr } = await supabaseSaas
+  const { error: updErr } = await (supabaseSaas as any)
     .schema('saas')
     .from('solicitacoes_acesso')
     .update({
@@ -366,7 +366,7 @@ export async function approveAccessRequest(params: { requestId: string; approver
 
   if (updErr) return false;
 
-  const { error: upsertErr } = await supabaseSaas
+  const { error: upsertErr } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .upsert(
@@ -388,7 +388,7 @@ export async function approveAccessRequest(params: { requestId: string; approver
 
 export async function rejectAccessRequest(params: { requestId: string; approverEmail: string }) {
   const approverId = await findApproverIdByEmail(params.approverEmail);
-  const { error } = await supabaseSaas
+  const { error } = await (supabaseSaas as any)
     .schema('saas')
     .from('solicitacoes_acesso')
     .update({
@@ -405,7 +405,7 @@ export async function getAllowedUserByEmail(email: string): Promise<AllowedUser 
   const empresaId = await getSaasEmpresaId();
   const normalized = norm(email);
 
-  const { data, error } = await supabaseSaas
+  const { data, error } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .select('email,nome,papel,senha_hash,avatar_url,status,criado_em,area_id,time_id')
@@ -436,7 +436,7 @@ export async function updateAllowedUserProfile(params: { email: string; name?: s
   if (typeof params.avatar === 'string') patch.avatar_url = params.avatar;
   if (!Object.keys(patch).length) return;
 
-  const { error } = await supabaseSaas
+  const { error } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .update(patch)
@@ -451,7 +451,7 @@ export async function autoCreateAppmaxUser(email: string): Promise<void> {
   const normalized = norm(email);
 
   // Check if already exists
-  const { data: existing } = await supabaseSaas
+  const { data: existing } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .select('id')
@@ -469,7 +469,7 @@ export async function autoCreateAppmaxUser(email: string): Promise<void> {
   const namePart = normalized.split('@')[0].replace(/[._]/g, ' ');
   const name = namePart.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-  const { error } = await supabaseSaas
+  const { error } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .insert({
@@ -487,7 +487,7 @@ export async function autoCreateAppmaxUser(email: string): Promise<void> {
 export async function resetUserPassword(email: string, newPassword: string): Promise<void> {
   const empresaId = await getSaasEmpresaId();
   const hash = await hashPassword(newPassword);
-  const { error } = await supabaseSaas
+  const { error } = await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .update({ senha_hash: hash })
@@ -499,7 +499,7 @@ export async function resetUserPassword(email: string, newPassword: string): Pro
 
 export async function recordLastLogin(email: string): Promise<void> {
   const empresaId = await getSaasEmpresaId();
-  await supabaseSaas
+  await (supabaseSaas as any)
     .schema('saas')
     .from('usuarios')
     .update({ ultimo_login_em: new Date().toISOString() })

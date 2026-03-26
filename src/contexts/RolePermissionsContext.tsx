@@ -163,7 +163,7 @@ export function RolePermissionsProvider({ children }: { children: React.ReactNod
               escopo: scopeToDb(updated.scope),
               permitido: updated.resources.includes(r.id),
             }));
-            const { error } = await supabaseSaas
+            const { error } = await (supabaseSaas as any)
               .schema('saas')
               .from('permissoes_papeis')
               .upsert(rows, { onConflict: 'papel,recurso' });

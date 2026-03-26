@@ -124,7 +124,7 @@ export function AuditLogProvider({ children }: { children: React.ReactNode }) {
           // Resolve email → UUID for usuario_id column
           let usuarioId: string | null = null;
           if (entry.userEmail) {
-            const { data: usr } = await supabaseSaas
+            const { data: usr } = await (supabaseSaas as any)
               .schema('saas')
               .from('usuarios')
               .select('id')
