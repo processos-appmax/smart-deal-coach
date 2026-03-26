@@ -408,19 +408,23 @@ export default function InboxPage() {
 
     setSending(true);
     try {
-      // Upload to Meta first
-      const upload = await uploadMediaToMeta(selectedAccount, file);
-      if (upload.error || !upload.mediaId) throw new Error(upload.error || 'Upload falhou');
-
       // Determine type
       const type = file.type.startsWith('image/') ? 'image'
         : file.type.startsWith('audio/') ? 'audio'
         : file.type.startsWith('video/') ? 'video'
         : 'document';
 
+      // Upload to Supabase Storage, send public URL to Meta (avoids CORS + format issues)
+      const ext = file.name.split('.').pop() || 'bin';
+      const storagePath = `${type}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('inbox-media').upload(storagePath, file, { contentType: file.type, upsert: true });
+      if (upErr) throw new Error(upErr.message);
+      const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(storagePath);
+      if (!urlData?.publicUrl) throw new Error('URL pública não disponível');
+
       const result = await sendMediaMessage(
         selectedAccount, selectedConv.id, selectedConv.contact_phone,
-        type, upload.mediaId, '', file.name,
+        type, urlData.publicUrl, '', type === 'document' ? file.name : undefined,
       );
 
       if (result.success) {
@@ -552,19 +556,18 @@ export default function InboxPage() {
         if (blob.size < 100) return;
         setSending(true);
         try {
-          // Upload to Supabase Storage then send link (avoids Meta format issues)
-          const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
-          const metaMime = mimeType.includes('mp4') ? 'audio/mp4' : 'audio/ogg';
+          // Strategy: upload to Supabase Storage, send public URL to Meta
+          const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'ogg';
+          const storageMime = mimeType.includes('mp4') ? 'audio/mp4' : 'audio/ogg';
           const fileName = `audio/${Date.now()}.${ext}`;
-          const { error: uploadErr } = await supabase.storage.from('inbox-media').upload(fileName, blob, { contentType: metaMime });
-          if (uploadErr) throw new Error(`Storage upload: ${uploadErr.message}`);
+          const { error: upErr } = await supabase.storage.from('inbox-media').upload(fileName, blob, { contentType: storageMime, upsert: true });
+          if (upErr) throw new Error(upErr.message);
           const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(fileName);
-          const audioUrl = urlData?.publicUrl;
-          if (!audioUrl) throw new Error('Não foi possível obter URL pública');
+          if (!urlData?.publicUrl) throw new Error('URL pública não disponível');
 
           const result = await sendMediaMessage(
             selectedAccount!, selectedConv!.id, selectedConv!.contact_phone,
-            'audio', audioUrl,
+            'audio', urlData.publicUrl,
           );
           if (result.success) {
             const data = await loadMessages(selectedConv!.id);
