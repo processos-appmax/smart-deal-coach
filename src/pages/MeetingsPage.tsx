@@ -958,8 +958,8 @@ export default function MeetingsPage() {
                         {/* Methodology selector — above criteria */}
                         {allEvals.length > 0 && (
                           <div className="space-y-2">
-                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Metodologia</p>
-                            <div className="flex gap-1.5 flex-wrap">
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide text-center">Metodologia</p>
+                            <div className="flex gap-1.5 flex-wrap justify-center">
                               {allEvals.map((ev, i) => (
                                 <button key={ev.id} onClick={() => setSelectedEvalIdx(i)}
                                   className={cn('text-[11px] px-2.5 py-1 rounded-lg border transition-all font-medium',
