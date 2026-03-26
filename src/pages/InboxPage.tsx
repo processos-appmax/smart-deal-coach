@@ -44,6 +44,20 @@ const AvatarInitials = ({ name }: { name: string }) => (
   </div>
 );
 
+/* ── Normalize Brazilian phone (ensure 9th digit for mobile) */
+function normalizePhone(phone: string): string {
+  let p = phone.replace(/\D/g, '');
+  // 55 + DDD(2) + 8 digits → add 9 after DDD for mobile
+  if (p.length === 12 && p.startsWith('55')) {
+    const ddd = p.substring(2, 4);
+    const number = p.substring(4);
+    if (/^[6-9]/.test(number)) {
+      p = `55${ddd}9${number}`;
+    }
+  }
+  return p;
+}
+
 /* ── Format time ───────────────────────────────────────── */
 function formatTime(ts: string | number) {
   const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts);
@@ -107,18 +121,19 @@ function NewConversationDialog({
   const previewText = tplParams.reduce((txt, val, i) => txt.replace(`{{${i + 1}}}`, val || `{{${i + 1}}}`), bodyText);
 
   const handleSend = async () => {
-    if (!phone.trim() || !selectedTpl || !account) return;
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone || !selectedTpl || !account) return;
     setSending(true);
     try {
       const empresaId = await getSaasEmpresaId();
 
-      // 1. Create or find conversation
+      // 1. Create or find conversation (normalized phone)
       let convId: string;
       const { data: existing } = await (supabase as any)
         .from('meta_inbox_conversations')
         .select('id')
         .eq('account_id', account.id)
-        .eq('contact_phone', phone.trim())
+        .eq('contact_phone', normalizedPhone)
         .maybeSingle();
 
       if (existing) {
@@ -129,8 +144,8 @@ function NewConversationDialog({
           .insert({
             account_id: account.id,
             empresa_id: empresaId,
-            contact_phone: phone.trim(),
-            contact_name: name.trim() || phone.trim(),
+            contact_phone: normalizedPhone,
+            contact_name: name.trim() || normalizedPhone,
             status: 'open',
           })
           .select('id')
@@ -150,14 +165,14 @@ function NewConversationDialog({
 
       // 3. Send template with rendered body
       const result = await sendTemplateMessage(
-        account, convId, phone.trim(),
+        account, convId, normalizedPhone,
         selectedTpl.name, selectedTpl.language, components,
         previewText,
       );
 
       if (!result.success) throw new Error(result.error);
 
-      toast({ title: 'Template enviado!', description: `${selectedTpl.name} → ${phone.trim()}` });
+      toast({ title: 'Template enviado!', description: `${selectedTpl.name} → ${normalizedPhone}` });
       setPhone(''); setName(''); setSelectedTpl(null); setTplParams([]);
       onSent();
       onClose();

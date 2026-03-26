@@ -28,6 +28,23 @@ const corsHeaders = {
 
 const log = (msg: string) => console.log(`[meta-webhook] ${msg}`);
 
+// ─── Normalize Brazilian phone (ensure 9th digit for mobile) ────────────────
+function normalizePhone(phone: string): string {
+  // Strip all non-digits
+  let p = phone.replace(/\D/g, '');
+  // Brazilian mobile: 55 + 2-digit DDD + 8 or 9 digit number
+  // If 55 + DDD(2) + 8 digits = 12 digits → add 9 after DDD
+  if (p.length === 12 && p.startsWith('55')) {
+    const ddd = p.substring(2, 4);
+    const number = p.substring(4);
+    // Mobile numbers start with 6-9 (after removing the leading 9 if present)
+    if (/^[6-9]/.test(number)) {
+      p = `55${ddd}9${number}`;
+    }
+  }
+  return p;
+}
+
 // ─── Find account by phone_number_id ────────────────────────────────────────
 async function findAccount(phoneNumberId: string) {
   const { data } = await sb
@@ -159,8 +176,9 @@ async function handleMessages(value: any) {
 
   // Inbound messages
   for (const msg of (value.messages || [])) {
-    const contactPhone = msg.from;
-    const contactInfo = (value.contacts || []).find((c: any) => c.wa_id === contactPhone);
+    const rawPhone = msg.from;
+    const contactPhone = normalizePhone(rawPhone);
+    const contactInfo = (value.contacts || []).find((c: any) => c.wa_id === rawPhone);
     const contactName = contactInfo?.profile?.name || null;
     const ts = msg.timestamp ? new Date(parseInt(msg.timestamp) * 1000) : new Date();
 
