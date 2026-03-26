@@ -148,10 +148,11 @@ function NewConversationDialog({
         });
       }
 
-      // 3. Send template
+      // 3. Send template with rendered body
       const result = await sendTemplateMessage(
         account, convId, phone.trim(),
         selectedTpl.name, selectedTpl.language, components,
+        previewText,
       );
 
       if (!result.success) throw new Error(result.error);
@@ -446,9 +447,11 @@ export default function InboxPage() {
     if (!selectedConv || !selectedAccount) return;
     setShowTemplatePicker(false);
     setSending(true);
+    const bodyComp = tmpl.components?.find((c: any) => c.type === 'BODY');
+    const bodyText = bodyComp?.text || tmpl.name;
     const result = await sendTemplateMessage(
       selectedAccount, selectedConv.id, selectedConv.contact_phone,
-      tmpl.name, tmpl.language,
+      tmpl.name, tmpl.language, undefined, bodyText,
     );
     if (result.success) {
       const data = await loadMessages(selectedConv.id);

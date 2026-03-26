@@ -251,6 +251,7 @@ export async function sendTemplateMessage(
   templateName: string,
   language: string,
   components?: any[],
+  renderedBody?: string,
 ): Promise<{ success: boolean; wamid?: string; error?: string }> {
   try {
     const templatePayload: Record<string, unknown> = {
@@ -289,7 +290,7 @@ export async function sendTemplateMessage(
       from_me: true,
       to_phone: toPhone,
       msg_type: 'template',
-      body: `[Template] ${templateName}`,
+      body: renderedBody || `[Template] ${templateName}`,
       template_name: templateName,
       template_language: language,
       template_components: components ? JSON.stringify(components) : null,
@@ -298,8 +299,9 @@ export async function sendTemplateMessage(
       sent_at: new Date().toISOString(),
     });
 
+    const displayMsg = renderedBody || `[Template] ${templateName}`;
     await supabase.from('meta_inbox_conversations').update({
-      last_message: `[Template] ${templateName}`,
+      last_message: displayMsg,
       last_message_ts: new Date().toISOString(),
       last_message_from_me: true,
     }).eq('id', conversationId);
