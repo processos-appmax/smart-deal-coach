@@ -555,10 +555,10 @@ export default function InboxPage() {
           // Upload to Supabase Storage then send link (avoids Meta format issues)
           const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
           const metaMime = mimeType.includes('mp4') ? 'audio/mp4' : 'audio/ogg';
-          const fileName = `inbox-audio/${Date.now()}.${ext}`;
-          const { error: uploadErr } = await supabase.storage.from('agente-arquivos').upload(fileName, blob, { contentType: metaMime });
+          const fileName = `audio/${Date.now()}.${ext}`;
+          const { error: uploadErr } = await supabase.storage.from('inbox-media').upload(fileName, blob, { contentType: metaMime });
           if (uploadErr) throw new Error(`Storage upload: ${uploadErr.message}`);
-          const { data: urlData } = supabase.storage.from('agente-arquivos').getPublicUrl(fileName);
+          const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(fileName);
           const audioUrl = urlData?.publicUrl;
           if (!audioUrl) throw new Error('Não foi possível obter URL pública');
 
