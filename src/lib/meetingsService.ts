@@ -373,15 +373,18 @@ export async function loadMeetingsFromDb(): Promise<DbMeeting[]> {
   const mapped = filteredRows.map((r: any) => {
     let duracao = r.duracao_minutos || 0;
 
-    // Extract duration from transcription: "A reunião terminou depois de HH:MM:SS"
-    if ((!duracao || duracao === 0) && r.transcricao) {
+    // ALWAYS extract duration from transcription (more accurate than calendar estimate)
+    if (r.transcricao) {
       const match = r.transcricao.match(/terminou depois de (\d{1,2}):(\d{2}):(\d{2})/i);
       if (match) {
         const h = parseInt(match[1], 10);
         const m = parseInt(match[2], 10);
         const s = parseInt(match[3], 10);
-        duracao = Math.round(h * 60 + m + s / 60);
-        if (duracao > 0) toUpdateDuration.push({ id: r.id, minutos: duracao });
+        const fromTranscript = Math.round(h * 60 + m + s / 60) || 1;
+        if (fromTranscript !== duracao) {
+          duracao = fromTranscript;
+          toUpdateDuration.push({ id: r.id, minutos: duracao });
+        }
       }
     }
 

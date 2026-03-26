@@ -661,7 +661,7 @@ export default function MeetingsPage() {
                             <Calendar className="w-3 h-3" />
                             {new Date(m.data_reuniao).toLocaleDateString('pt-BR')}
                             <span className="ml-1 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />{m.duracao_minutos}min
+                              <Clock className="w-3 h-3" />{m.duracao_minutos > 0 ? `${m.duracao_minutos}min` : '—'}
                             </span>
                           </div>
                         </td>
@@ -791,7 +791,7 @@ export default function MeetingsPage() {
                   </div>
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Clock className="w-3 h-3" />
-                    {selectedMeeting.duracao_minutos} min
+                    {selectedMeeting.duracao_minutos > 0 ? `${selectedMeeting.duracao_minutos} min` : '—'}
                   </div>
                 </div>
                 {selectedMeeting.link_meet && (
