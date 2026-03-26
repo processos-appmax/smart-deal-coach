@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useCallback, useRef } from 'react';
 import type { UserRole } from '@/types';
-import { supabase, supabaseSaas, supabaseSaas } from '@/integrations/supabase/client';
+import { supabase, supabaseSaas } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
 
 // ── Types ──────────────────────────────────────────────────────────────────

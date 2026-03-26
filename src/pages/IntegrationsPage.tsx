@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { assignInstanceToUser, getInstanceForUserFromList, type EvolutionInstance } from '@/hooks/useEvolutionInstances';
 import { loadAllowedUsers } from '@/lib/accessControl';
-import { supabase, supabaseSaas, supabaseSaas } from '@/integrations/supabase/client';
+import { supabase, supabaseSaas } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
 
 import { CONFIG } from '@/lib/config';
