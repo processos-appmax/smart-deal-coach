@@ -537,8 +537,10 @@ export default function InboxPage() {
     if (!selectedAccount || !selectedConv) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Try ogg first (Meta requires it), fall back to webm
-      const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+      // Use mp4 if available (Meta accepts it), fallback to webm then ogg
+      const mimeType = MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
         ? 'audio/ogg;codecs=opus'
         : 'audio/webm;codecs=opus';
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
@@ -550,13 +552,19 @@ export default function InboxPage() {
         if (blob.size < 100) return;
         setSending(true);
         try {
-          // Meta accepts: audio/ogg, audio/aac, audio/mp4, audio/amr, audio/mpeg
-          const file = new File([blob], 'audio.ogg', { type: 'audio/ogg' });
-          const upload = await uploadMediaToMeta(selectedAccount!, file);
-          if (upload.error || !upload.mediaId) throw new Error(upload.error || 'Upload falhou');
+          // Upload to Supabase Storage then send link (avoids Meta format issues)
+          const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+          const metaMime = mimeType.includes('mp4') ? 'audio/mp4' : 'audio/ogg';
+          const fileName = `inbox-audio/${Date.now()}.${ext}`;
+          const { error: uploadErr } = await supabase.storage.from('agente-arquivos').upload(fileName, blob, { contentType: metaMime });
+          if (uploadErr) throw new Error(`Storage upload: ${uploadErr.message}`);
+          const { data: urlData } = supabase.storage.from('agente-arquivos').getPublicUrl(fileName);
+          const audioUrl = urlData?.publicUrl;
+          if (!audioUrl) throw new Error('Não foi possível obter URL pública');
+
           const result = await sendMediaMessage(
             selectedAccount!, selectedConv!.id, selectedConv!.contact_phone,
-            'audio', upload.mediaId,
+            'audio', audioUrl,
           );
           if (result.success) {
             const data = await loadMessages(selectedConv!.id);
@@ -805,10 +813,34 @@ export default function InboxPage() {
                         ? <img src={msg.media_url} alt="imagem" className="max-w-full max-h-60 object-contain" />
                         : <video src={msg.media_url} controls className="max-w-full max-h-60" />
                     )}
-                    {/* Audio */}
-                    {(msg.msg_type === 'audio' || msg.msg_type === 'ptt') && msg.media_url && (
-                      <div className="px-3.5 py-2">
-                        <audio controls className="max-w-[240px] h-8"><source src={msg.media_url} /></audio>
+                    {/* Audio — WhatsApp style */}
+                    {(msg.msg_type === 'audio' || msg.msg_type === 'ptt') && (
+                      <div className="px-3 py-2">
+                        <div className={cn('flex items-center gap-2 rounded-full px-3 py-1.5 min-w-[200px]',
+                          msg.from_me ? 'bg-white/10' : 'bg-muted/50'
+                        )}>
+                          <button
+                            className={cn('w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
+                              msg.from_me ? 'bg-white/20 text-primary-foreground' : 'bg-primary/20 text-primary'
+                            )}
+                            onClick={(e) => {
+                              const audio = (e.currentTarget.parentElement?.querySelector('audio') as HTMLAudioElement);
+                              if (audio) { audio.paused ? audio.play() : audio.pause(); }
+                            }}
+                          >
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 ml-0.5"><path d="M8 5v14l11-7z"/></svg>
+                          </button>
+                          {/* Waveform bars (visual only) */}
+                          <div className="flex items-center gap-[2px] flex-1 h-6">
+                            {Array.from({ length: 28 }, (_, i) => {
+                              const h = Math.sin(i * 0.7) * 0.5 + Math.random() * 0.5;
+                              return <div key={i} className={cn('w-[3px] rounded-full', msg.from_me ? 'bg-white/40' : 'bg-primary/40')}
+                                style={{ height: `${Math.max(3, h * 20)}px` }} />;
+                            })}
+                          </div>
+                          <Mic className={cn('w-4 h-4 flex-shrink-0', msg.from_me ? 'text-white/50' : 'text-primary/50')} />
+                          {msg.media_url && <audio src={msg.media_url} preload="metadata" className="hidden" />}
+                        </div>
                       </div>
                     )}
                     {/* Document */}
@@ -818,8 +850,8 @@ export default function InboxPage() {
                         <span className="text-xs truncate">{msg.media_filename || msg.body}</span>
                       </div>
                     )}
-                    {/* Body text */}
-                    {msg.body && msg.msg_type !== 'document' && (
+                    {/* Body text (hide for audio/media-only) */}
+                    {msg.body && msg.msg_type !== 'document' && msg.msg_type !== 'audio' && msg.msg_type !== 'ptt' && !(msg.body === '[Áudio]') && (
                       <p className="px-3.5 py-2 leading-relaxed whitespace-pre-wrap">{msg.body}</p>
                     )}
                     {/* Template buttons */}
