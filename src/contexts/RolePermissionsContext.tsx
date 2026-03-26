@@ -164,7 +164,7 @@ export function RolePermissionsProvider({ children }: { children: React.ReactNod
               permitido: updated.resources.includes(r.id),
             }));
             const { error } = await supabaseSaas
-              .schema(\'saas\')
+              .schema('saas')
               .from('permissoes_papeis')
               .upsert(rows, { onConflict: 'papel,recurso' });
             if (error) throw error;
