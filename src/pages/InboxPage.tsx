@@ -763,17 +763,63 @@ export default function InboxPage() {
                   <MessageSquare className="w-8 h-8 opacity-20 mb-2" />
                   <p className="text-xs">Nenhuma mensagem nesta conversa</p>
                 </div>
-              ) : messages.map(msg => (
+              ) : messages.map(msg => {
+                // Parse template components if available
+                let tplComps: any[] = [];
+                try { tplComps = msg.template_components ? (typeof msg.template_components === 'string' ? JSON.parse(msg.template_components) : msg.template_components) : []; } catch { /* */ }
+
+                return (
                 <div key={msg.id} className={cn('flex', msg.from_me ? 'justify-end' : 'justify-start')}>
                   <div className={cn(
-                    'max-w-[70%] rounded-2xl px-3.5 py-2 text-sm shadow-sm',
+                    'max-w-[70%] rounded-2xl text-sm shadow-sm overflow-hidden',
                     msg.from_me
                       ? 'bg-primary text-primary-foreground rounded-br-sm'
                       : 'bg-card text-foreground border border-border rounded-bl-sm'
                   )}>
-                    <p className="leading-relaxed whitespace-pre-wrap">{msg.body}</p>
+                    {/* Media (image/video) */}
+                    {(msg.msg_type === 'image' || msg.msg_type === 'video') && msg.media_url && (
+                      msg.msg_type === 'image'
+                        ? <img src={msg.media_url} alt="imagem" className="max-w-full max-h-60 object-contain" />
+                        : <video src={msg.media_url} controls className="max-w-full max-h-60" />
+                    )}
+                    {/* Audio */}
+                    {(msg.msg_type === 'audio' || msg.msg_type === 'ptt') && msg.media_url && (
+                      <div className="px-3.5 py-2">
+                        <audio controls className="max-w-[240px] h-8"><source src={msg.media_url} /></audio>
+                      </div>
+                    )}
+                    {/* Document */}
+                    {msg.msg_type === 'document' && (
+                      <div className="px-3.5 py-2 flex items-center gap-2">
+                        <FileText className="w-4 h-4 flex-shrink-0 opacity-70" />
+                        <span className="text-xs truncate">{msg.media_filename || msg.body}</span>
+                      </div>
+                    )}
+                    {/* Body text */}
+                    {msg.body && msg.msg_type !== 'document' && (
+                      <p className="px-3.5 py-2 leading-relaxed whitespace-pre-wrap">{msg.body}</p>
+                    )}
+                    {/* Template buttons */}
+                    {msg.msg_type === 'template' && tplComps.length > 0 && (() => {
+                      const btnComp = tplComps.find((c: any) => c.type === 'BUTTONS' || c.type === 'buttons');
+                      const buttons = btnComp?.buttons || [];
+                      if (buttons.length === 0) return null;
+                      return (
+                        <div className="border-t border-white/10 px-3.5 py-1.5 flex flex-wrap gap-1">
+                          {buttons.map((btn: any, bi: number) => (
+                            <span key={bi} className={cn(
+                              'text-[10px] px-2.5 py-1 rounded-full border font-medium',
+                              msg.from_me ? 'border-white/20 text-primary-foreground/80' : 'border-border text-muted-foreground'
+                            )}>
+                              {btn.text}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    {/* Error + retry */}
                     {msg.error_message && (
-                      <div className="mt-1">
+                      <div className="px-3.5 pb-1">
                         <p className="text-[9px] text-destructive flex items-center gap-1">
                           <AlertTriangle className="w-2.5 h-2.5" /> {msg.error_message}
                         </p>
@@ -784,18 +830,22 @@ export default function InboxPage() {
                       </div>
                     )}
                     {msg.status === 'failed' && !msg.error_message && (
-                      <button onClick={() => handleRetry(msg)}
-                        className="text-[9px] text-primary-foreground/80 hover:text-primary-foreground flex items-center gap-1 mt-1 underline">
-                        <RotateCcw className="w-2.5 h-2.5" /> Reenviar
-                      </button>
+                      <div className="px-3.5 pb-1">
+                        <button onClick={() => handleRetry(msg)}
+                          className="text-[9px] text-primary-foreground/80 hover:text-primary-foreground flex items-center gap-1 underline">
+                          <RotateCcw className="w-2.5 h-2.5" /> Reenviar
+                        </button>
+                      </div>
                     )}
-                    <div className={cn('flex items-center gap-1 mt-1', msg.from_me ? 'justify-end' : 'justify-start')}>
+                    {/* Timestamp + status */}
+                    <div className={cn('flex items-center gap-1 px-3.5 pb-1.5', msg.from_me ? 'justify-end' : 'justify-start')}>
                       <span className="text-[10px] opacity-70">{formatTime(msg.timestamp)}</span>
                       {msg.from_me && <MsgStatusIcon status={msg.status} />}
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
 

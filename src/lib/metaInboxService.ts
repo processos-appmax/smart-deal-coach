@@ -38,6 +38,8 @@ export interface InboxMessage {
   media_mime: string | null;
   media_filename: string | null;
   template_name: string | null;
+  template_language: string | null;
+  template_components: any;
   status: string;
   error_code: string | null;
   error_message: string | null;
