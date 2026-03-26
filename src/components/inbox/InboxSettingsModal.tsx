@@ -703,10 +703,11 @@ export default function InboxSettingsModal({ onClose, onSaved, accounts = [], on
                     <label className="text-xs font-medium block mb-1">URL do Webhook</label>
                     <div className="flex items-center gap-2">
                       <code className="flex-1 text-xs bg-muted rounded-md px-3 py-2 font-mono truncate">
-                        {`https://${window.location.hostname}/api/webhook/whatsapp`}
+                        {`${import.meta.env.VITE_SUPABASE_URL || 'https://lwusznsduxcqjjmbbobt.supabase.co'}/functions/v1/meta-webhook`}
                       </code>
                       <Button variant="outline" size="sm" className="text-xs h-8 gap-1.5" onClick={() => {
-                        navigator.clipboard.writeText(`https://${window.location.hostname}/api/webhook/whatsapp`);
+                        const url = `${import.meta.env.VITE_SUPABASE_URL || 'https://lwusznsduxcqjjmbbobt.supabase.co'}/functions/v1/meta-webhook`;
+                        navigator.clipboard.writeText(url);
                         toast({ title: 'URL copiada!' });
                       }}>
                         <Copy className="w-3 h-3" /> Copiar
