@@ -7,7 +7,7 @@ import {
   Inbox, Search, MessageSquare, Settings, Send, CheckCheck, Plus,
   Loader2, RefreshCw, ChevronRight, Phone, Clock, Check,
   Paperclip, Image as ImageIcon, FileText, Mic, LayoutTemplate,
-  AlertTriangle, X, UserPlus,
+  AlertTriangle, X, UserPlus, Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -292,6 +292,7 @@ export default function InboxPage() {
   const [sending, setSending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newConvOpen, setNewConvOpen] = useState(false);
+  const [confirmDeleteConv, setConfirmDeleteConv] = useState<InboxConversation | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -464,6 +465,21 @@ export default function InboxPage() {
   };
 
   // ── Start new conversation ─────────────────────────────
+  // ── Delete conversation ─────────────────────────────────
+  const handleDeleteConversation = async (conv: InboxConversation) => {
+    try {
+      // Delete messages first, then conversation
+      await (supabase as any).from('meta_inbox_messages').delete().eq('conversation_id', conv.id);
+      await (supabase as any).from('meta_inbox_conversations').delete().eq('id', conv.id);
+      if (selectedConv?.id === conv.id) { setSelectedConv(null); setMessages([]); }
+      setConfirmDeleteConv(null);
+      await loadConvs();
+      toast({ title: 'Conversa apagada' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao apagar', description: e.message });
+    }
+  };
+
   // ── Filter conversations ───────────────────────────────
   const filteredConvs = conversations.filter(c =>
     !searchQuery ||
@@ -620,6 +636,12 @@ export default function InboxPage() {
               )}>
                 {within24h ? '24h ativa' : 'Fora da janela'}
               </span>
+              {/* Delete chat */}
+              <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-destructive"
+                title="Apagar conversa"
+                onClick={() => setConfirmDeleteConv(selectedConv)}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
             </div>
 
             {/* 24h warning banner */}
@@ -743,6 +765,33 @@ export default function InboxPage() {
       <NewConversationDialog open={newConvOpen} onClose={() => setNewConvOpen(false)} account={selectedAccount} onSent={loadConvs} />
 
       {/* Settings modal */}
+      {/* Confirm delete conversation */}
+      {confirmDeleteConv && (
+        <Dialog open onOpenChange={() => setConfirmDeleteConv(null)}>
+          <DialogContent className="max-w-sm bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="text-sm flex items-center gap-2 text-destructive">
+                <Trash2 className="w-4 h-4" /> Apagar conversa
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 pt-1">
+              <p className="text-sm text-muted-foreground">
+                Tem certeza que deseja apagar a conversa com <strong>{confirmDeleteConv.contact_name || confirmDeleteConv.contact_phone}</strong>?
+                Todas as mensagens serão excluídas permanentemente.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => setConfirmDeleteConv(null)}>
+                  Cancelar
+                </Button>
+                <Button size="sm" variant="destructive" className="text-xs" onClick={() => handleDeleteConversation(confirmDeleteConv)}>
+                  <Trash2 className="w-3 h-3 mr-1.5" /> Apagar
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {settingsOpen && (
         <InboxSettingsModal onClose={() => setSettingsOpen(false)} onSaved={loadAccountsFn}
           accounts={accounts} onAccountsChange={setAccounts} />
