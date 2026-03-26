@@ -115,8 +115,8 @@ export function RolePermissionsProvider({ children }: { children: React.ReactNod
   useEffect(() => {
     const run = async () => {
       try {
-        const { data, error } = await supabase
-          .schema('saas')
+        const { data, error } = await supabaseSaas
+          .schema(\'saas\')
           .from('permissoes_papeis')
           .select('papel,recurso,escopo,permitido');
         if (error) throw error;
@@ -163,8 +163,8 @@ export function RolePermissionsProvider({ children }: { children: React.ReactNod
               escopo: scopeToDb(updated.scope),
               permitido: updated.resources.includes(r.id),
             }));
-            const { error } = await supabase
-              .schema('saas')
+            const { error } = await supabaseSaas
+              .schema(\'saas\')
               .from('permissoes_papeis')
               .upsert(rows, { onConflict: 'papel,recurso' });
             if (error) throw error;

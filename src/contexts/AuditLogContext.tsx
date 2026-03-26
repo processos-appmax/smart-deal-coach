@@ -81,8 +81,8 @@ export function AuditLogProvider({ children }: { children: React.ReactNode }) {
     const run = async () => {
       try {
         const empresaId = await getSaasEmpresaId();
-        const { data, error } = await supabase
-          .schema('saas')
+        const { data, error } = await supabaseSaas
+          .schema(\'saas\')
           .from('logs_auditoria')
           .select('id,usuario_id,tipo_evento,pagina,pagina_label,metadados,criado_em')
           .eq('empresa_id', empresaId)
@@ -124,8 +124,8 @@ export function AuditLogProvider({ children }: { children: React.ReactNode }) {
           // Resolve email → UUID for usuario_id column
           let usuarioId: string | null = null;
           if (entry.userEmail) {
-            const { data: usr } = await supabase
-              .schema('saas')
+            const { data: usr } = await supabaseSaas
+              .schema(\'saas\')
               .from('usuarios')
               .select('id')
               .eq('empresa_id', empresaId)
