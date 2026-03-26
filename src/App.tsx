@@ -57,6 +57,7 @@ function ProtectedRoutes() {
         <Route path="/dashboard"    element={<DashboardPage />} />
         <Route path="/meetings"     element={<MeetingsPage />} />
         <Route path="/whatsapp"     element={<WhatsAppPage />} />
+        <Route path="/inbox"        element={<InboxPage />} />
         <Route path="/training"     element={<TrainingPage />} />
         <Route path="/teams"        element={<TeamsPage />} />
         <Route path="/users"        element={<UsersPage />} />

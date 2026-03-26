@@ -11,7 +11,7 @@ import {
   LayoutDashboard, Video, MessageSquare, Users, Bell,
   BarChart3, Zap, ChevronLeft, ChevronRight,
   LogOut, ChevronDown, Building2, Shield, Plug2,
-  GraduationCap, SlidersHorizontal, User, Target, Activity
+  GraduationCap, SlidersHorizontal, User, Target, Activity, Inbox,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
