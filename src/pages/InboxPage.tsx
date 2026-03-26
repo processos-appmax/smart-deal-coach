@@ -437,6 +437,8 @@ export default function InboxPage() {
 
   // ── Send template ──────────────────────────────────────
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [pickerSelectedTpl, setPickerSelectedTpl] = useState<any | null>(null);
+  const [pickerParams, setPickerParams] = useState<string[]>([]);
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -462,23 +464,39 @@ export default function InboxPage() {
     setLoadingTemplates(false);
   };
 
-  const handleSendTemplate = async (tmpl: any) => {
-    if (!selectedConv || !selectedAccount) return;
-    setShowTemplatePicker(false);
+  const handleSendTemplate = async () => {
+    if (!selectedConv || !selectedAccount || !pickerSelectedTpl) return;
     setSending(true);
-    const bodyComp = tmpl.components?.find((c: any) => c.type === 'BODY');
-    const bodyText = bodyComp?.text || tmpl.name;
-    const result = await sendTemplateMessage(
-      selectedAccount, selectedConv.id, selectedConv.contact_phone,
-      tmpl.name, tmpl.language, undefined, bodyText,
-    );
-    if (result.success) {
-      const data = await loadMessages(selectedConv.id);
-      setMessages(data);
-      toast({ title: 'Template enviado!', description: tmpl.name });
-    } else {
-      toast({ variant: 'destructive', title: 'Erro ao enviar template', description: result.error });
+    try {
+      const bodyComp = pickerSelectedTpl.components?.find((c: any) => c.type === 'BODY');
+      const bodyRaw = bodyComp?.text || pickerSelectedTpl.name;
+      const renderedBody = pickerParams.reduce((txt: string, val: string, i: number) => txt.replace(`{{${i + 1}}}`, val || `{{${i + 1}}}`), bodyRaw);
+
+      const components: any[] = [];
+      if (pickerParams.length > 0) {
+        components.push({
+          type: 'body',
+          parameters: pickerParams.map(v => ({ type: 'text', text: v || ' ' })),
+        });
+      }
+
+      const result = await sendTemplateMessage(
+        selectedAccount, selectedConv.id, selectedConv.contact_phone,
+        pickerSelectedTpl.name, pickerSelectedTpl.language, components, renderedBody,
+      );
+      if (result.success) {
+        const data = await loadMessages(selectedConv.id);
+        setMessages(data);
+        toast({ title: 'Template enviado!', description: pickerSelectedTpl.name });
+      } else {
+        toast({ variant: 'destructive', title: 'Erro ao enviar template', description: result.error });
+      }
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro', description: e.message });
     }
+    setShowTemplatePicker(false);
+    setPickerSelectedTpl(null);
+    setPickerParams([]);
     setSending(false);
   };
 
@@ -904,34 +922,93 @@ export default function InboxPage() {
 
       {/* Template picker modal */}
       {showTemplatePicker && (
-        <Dialog open onOpenChange={() => setShowTemplatePicker(false)}>
-          <DialogContent className="max-w-md bg-card border-border max-h-[70vh] flex flex-col">
+        <Dialog open onOpenChange={() => { setShowTemplatePicker(false); setPickerSelectedTpl(null); setPickerParams([]); }}>
+          <DialogContent className="max-w-lg bg-card border-border max-h-[80vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="text-sm flex items-center gap-2">
-                <LayoutTemplate className="w-4 h-4 text-primary" /> Selecionar Template
+                <LayoutTemplate className="w-4 h-4 text-primary" />
+                {pickerSelectedTpl ? 'Preencher parâmetros' : 'Selecionar Template'}
               </DialogTitle>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto space-y-1.5 pt-2">
-              {loadingTemplates ? (
-                <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" /></div>
-              ) : templatesList.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-8">Nenhum template aprovado encontrado</p>
-              ) : templatesList.map((t: any) => (
-                <button key={t.id} onClick={() => handleSendTemplate(t)}
-                  className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-2 mb-1">
-                    <code className="text-xs font-mono font-semibold">{t.name}</code>
-                    <Badge variant="outline" className="text-[9px] h-4 px-1">{t.category}</Badge>
-                    <span className="text-[10px] text-muted-foreground">{t.language}</span>
+
+            {!pickerSelectedTpl ? (
+              /* Step 1: Select template */
+              <div className="flex-1 overflow-y-auto space-y-1.5 pt-2">
+                {loadingTemplates ? (
+                  <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" /></div>
+                ) : templatesList.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">Nenhum template aprovado encontrado</p>
+                ) : templatesList.map((t: any) => (
+                  <button key={t.id} onClick={() => {
+                    setPickerSelectedTpl(t);
+                    const body = t.components?.find((c: any) => c.type === 'BODY')?.text || '';
+                    const matches = body.match(/\{\{\d+\}\}/g) || [];
+                    setPickerParams(matches.map(() => ''));
+                  }}
+                    className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2 mb-1">
+                      <code className="text-xs font-mono font-semibold">{t.name}</code>
+                      <Badge variant="outline" className="text-[9px] h-4 px-1">{t.category}</Badge>
+                      <span className="text-[10px] text-muted-foreground">{t.language}</span>
+                    </div>
+                    {t.components?.find((c: any) => c.type === 'BODY')?.text && (
+                      <p className="text-[11px] text-muted-foreground line-clamp-2">
+                        {t.components.find((c: any) => c.type === 'BODY').text}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              /* Step 2: Fill params + preview + send */
+              <div className="flex-1 overflow-y-auto space-y-4 pt-2">
+                {/* Preview */}
+                <div className="rounded-xl border border-border bg-secondary/50 p-4">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Prévia</p>
+                  <div className="bg-primary/10 rounded-xl p-3 text-sm whitespace-pre-wrap">
+                    {pickerParams.reduce((txt: string, val: string, i: number) =>
+                      txt.replace(`{{${i + 1}}}`, val || `{{${i + 1}}}`),
+                      pickerSelectedTpl.components?.find((c: any) => c.type === 'BODY')?.text || ''
+                    )}
                   </div>
-                  {t.components?.find((c: any) => c.type === 'BODY')?.text && (
-                    <p className="text-[11px] text-muted-foreground line-clamp-2">
-                      {t.components.find((c: any) => c.type === 'BODY').text}
+                </div>
+
+                {/* Params */}
+                {pickerParams.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                      Parâmetros ({pickerParams.length})
                     </p>
-                  )}
-                </button>
-              ))}
-            </div>
+                    {pickerParams.map((val, i) => (
+                      <div key={i}>
+                        <label className="text-[11px] text-muted-foreground block mb-0.5">{`{{${i + 1}}}`}</label>
+                        <Input value={val}
+                          onChange={e => { const next = [...pickerParams]; next[i] = e.target.value; setPickerParams(next); }}
+                          placeholder={`Valor para {{${i + 1}}}`}
+                          className="h-8 text-xs bg-background border-border" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* No params = just confirm */}
+                {pickerParams.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Este template não possui parâmetros. Clique em enviar.</p>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="text-xs"
+                    onClick={() => { setPickerSelectedTpl(null); setPickerParams([]); }}>
+                    Voltar
+                  </Button>
+                  <Button size="sm" className="flex-1 text-xs" onClick={handleSendTemplate} disabled={sending}>
+                    {sending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-1.5" />}
+                    Enviar template
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       )}
