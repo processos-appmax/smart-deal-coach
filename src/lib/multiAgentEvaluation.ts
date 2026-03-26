@@ -240,24 +240,39 @@ export async function evaluateMeetingMultiAgent(
   }
 
   // Step 2: Evaluate ALL active avaliadores in parallel
-  const evalPromises = activeAvaliadores.map(async (avaliador) => {
-    const files = await loadAgentFiles(avaliador.id);
-    const fileTexts = files
-      .filter(f => f.texto_extraido && f.texto_extraido.length > 0)
-      .map(f => `[${f.nome}]\n${f.texto_extraido}`);
+  console.log(`[multiAgent] Evaluating with ${activeAvaliadores.length} agents: ${activeAvaliadores.map(a => a.nome).join(', ')}`);
 
-    const t1 = Date.now();
-    const result = await evaluateWithAgent(avaliador, apiToken, titulo, transcricao, fileTexts);
-    const step: ChainStep = {
-      agente: avaliador.nome, tipo: 'avaliador',
-      input_resumo: `Transcrição: ${transcricao.length} chars, ${fileTexts.length} arquivos ref`,
-      output_resumo: `Score: ${result.totalScore}, ${result.criteriaScores?.length || 0} critérios`,
-      duracao_ms: Date.now() - t1,
-    };
-    return { avaliador, result, step };
+  const evalPromises = activeAvaliadores.map(async (avaliador) => {
+    try {
+      const files = await loadAgentFiles(avaliador.id);
+      const fileTexts = files
+        .filter(f => f.texto_extraido && f.texto_extraido.length > 0)
+        .map(f => `[${f.nome}]\n${f.texto_extraido}`);
+
+      const t1 = Date.now();
+      const result = await evaluateWithAgent(avaliador, apiToken, titulo, transcricao, fileTexts);
+      const step: ChainStep = {
+        agente: avaliador.nome, tipo: 'avaliador',
+        input_resumo: `Transcrição: ${transcricao.length} chars, ${fileTexts.length} arquivos ref`,
+        output_resumo: `Score: ${result.totalScore}, ${result.criteriaScores?.length || 0} critérios`,
+        duracao_ms: Date.now() - t1,
+      };
+      console.log(`[multiAgent] ✓ ${avaliador.nome}: score ${result.totalScore}`);
+      return { avaliador, result, step };
+    } catch (err: any) {
+      console.error(`[multiAgent] ✗ ${avaliador.nome} failed:`, err.message);
+      return null;
+    }
   });
 
-  const evalResults = await Promise.all(evalPromises);
+  const rawResults = await Promise.all(evalPromises);
+  const evalResults = rawResults.filter((r): r is NonNullable<typeof r> => r !== null);
+  console.log(`[multiAgent] ${evalResults.length}/${activeAvaliadores.length} evaluations succeeded`);
+
+  if (evalResults.length === 0) {
+    console.error('[multiAgent] All evaluations failed');
+    return null;
+  }
 
   // Add all avaliador steps to chainLog
   for (const er of evalResults) {
