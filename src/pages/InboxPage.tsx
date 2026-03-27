@@ -648,23 +648,26 @@ export default function InboxPage() {
         if (blob.size < 100) return;
         setSending(true);
         try {
-          // Convert WebM → WAV (PCM) via AudioContext, then upload to Storage
+          // Convert WebM → WAV → upload to Storage → send as audio link
+          // Meta doesn't accept WAV via URL, so we convert + upload to Storage
+          // and send the WAV as a document (which Meta accepts for any type)
           const arrayBuffer = await blob.arrayBuffer();
           const audioCtx = new AudioContext();
           const decoded = await audioCtx.decodeAudioData(arrayBuffer);
           const wavBlob = audioBufferToWav(decoded);
           audioCtx.close();
 
-          // Upload WAV to Supabase Storage → send public URL to Meta
+          // Upload to Storage
           const fileName = `audio/${Date.now()}.wav`;
           const { error: upErr } = await supabase.storage.from('inbox-media').upload(fileName, wavBlob, { contentType: 'audio/wav', upsert: true });
           if (upErr) throw new Error(upErr.message);
           const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(fileName);
-          if (!urlData?.publicUrl) throw new Error('URL pública não disponível');
+          if (!urlData?.publicUrl) throw new Error('URL não disponível');
 
+          // Send as document (Meta accepts any format as document)
           const result = await sendMediaMessage(
             selectedAccount!, selectedConv!.id, selectedConv!.contact_phone,
-            'audio', urlData.publicUrl,
+            'document', urlData.publicUrl, 'Mensagem de voz', 'audio.wav',
           );
           if (result.success) {
             const data = await loadMessages(selectedConv!.id);
