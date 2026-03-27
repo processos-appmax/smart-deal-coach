@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseSaas } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
 import { CONFIG } from '@/lib/config';
 

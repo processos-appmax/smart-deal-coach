@@ -12,7 +12,7 @@ export function normalizeEmail(email: string): string {
 export async function getSaasEmpresaId(): Promise<string> {
   if (empresaIdCache) return empresaIdCache;
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .schema('saas')
     .from('empresas')
     .select('id')
@@ -25,7 +25,7 @@ export async function getSaasEmpresaId(): Promise<string> {
     return data.id;
   }
 
-  const { data: created, error: createError } = await supabase
+  const { data: created, error: createError } = await (supabase as any)
     .schema('saas')
     .from('empresas')
     .insert({ nome: 'Appmax', dominio: ALLOWED_DOMAIN, plano: 'enterprise' })

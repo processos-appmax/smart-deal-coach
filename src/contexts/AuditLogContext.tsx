@@ -134,7 +134,7 @@ export function AuditLogProvider({ children }: { children: React.ReactNode }) {
             usuarioId = usr?.id ?? null;
           }
 
-          await supabaseSaas.schema('saas').from('logs_auditoria').insert({
+          await (supabaseSaas as any).schema('saas').from('logs_auditoria').insert({
             empresa_id: empresaId,
             usuario_id: usuarioId,
             tipo_evento: entry.type,
@@ -161,7 +161,7 @@ export function AuditLogProvider({ children }: { children: React.ReactNode }) {
     void (async () => {
       try {
         const empresaId = await getSaasEmpresaId();
-        await supabaseSaas.schema('saas').from('logs_auditoria').delete().eq('empresa_id', empresaId);
+        await (supabaseSaas as any).schema('saas').from('logs_auditoria').delete().eq('empresa_id', empresaId);
       } catch {
         // no-op
       }
