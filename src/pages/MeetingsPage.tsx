@@ -137,6 +137,7 @@ function ManualMeetingModal({
   const { toast } = useToast();
   const [emails, setEmails] = useState('');
   const [titulo, setTitulo] = useState('');
+  const [dataReuniao, setDataReuniao] = useState(new Date().toISOString().split('T')[0]);
   const [descricao, setDescricao] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -164,15 +165,19 @@ function ManualMeetingModal({
         arquivoOriginal = file.name;
         if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
           transcricao = await file.text();
-        } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-          // For PDF: upload to storage and store text as placeholder
-          // Real PDF extraction would need a server-side lib
-          transcricao = descricao.trim() || `[Conteúdo do arquivo: ${file.name}]`;
-          toast({ title: 'PDF detectado', description: 'Para PDFs, cole o texto no campo de transcrição manualmente.' });
         } else {
-          transcricao = await file.text();
+          // PDF, DOCX etc — não são texto puro, usar campo de transcrição
+          if (!descricao.trim()) {
+            toast({ variant: 'destructive', title: 'Arquivo não suportado para extração automática', description: 'Cole o conteúdo da transcrição no campo de texto.' });
+            setSaving(false);
+            return;
+          }
+          transcricao = descricao.trim();
         }
       }
+
+      // Sanitize: remove problematic Unicode characters
+      transcricao = transcricao.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
 
       // Parse emails
       const emailList = emails.split(/[,;\n]/).map(e => e.trim().toLowerCase()).filter(Boolean);
@@ -205,7 +210,7 @@ function ManualMeetingModal({
         .insert({
           empresa_id: empresaId,
           titulo: titulo.trim(),
-          data_reuniao: new Date().toISOString(),
+          data_reuniao: new Date(dataReuniao + 'T12:00:00').toISOString(),
           duracao_minutos: duracao,
           status: 'concluida',
           transcricao: transcricao || null,
@@ -231,7 +236,7 @@ function ManualMeetingModal({
           .catch(() => {});
       }
 
-      setEmails(''); setTitulo(''); setDescricao(''); setFile(null);
+      setEmails(''); setTitulo(''); setDataReuniao(new Date().toISOString().split('T')[0]); setDescricao(''); setFile(null);
       onCreated();
       onClose();
     } catch (e: any) {
@@ -262,12 +267,19 @@ function ManualMeetingModal({
             <p className="text-[10px] text-muted-foreground mt-0.5">O primeiro e-mail será o vendedor responsável</p>
           </div>
 
-          {/* Title */}
-          <div>
-            <label className="text-xs font-medium block mb-1">Título / Descritivo *</label>
-            <Input value={titulo} onChange={e => setTitulo(e.target.value)}
-              placeholder="Ex: Apresentação de proposta — Cliente XPTO"
-              className="h-9 text-sm bg-secondary border-border" />
+          {/* Title + Date */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs font-medium block mb-1">Título / Descritivo *</label>
+              <Input value={titulo} onChange={e => setTitulo(e.target.value)}
+                placeholder="Ex: Apresentação de proposta — Cliente XPTO"
+                className="h-9 text-sm bg-secondary border-border" />
+            </div>
+            <div>
+              <label className="text-xs font-medium block mb-1">Data *</label>
+              <Input type="date" value={dataReuniao} onChange={e => setDataReuniao(e.target.value)}
+                className="h-9 text-sm bg-secondary border-border" />
+            </div>
           </div>
 
           {/* File upload */}
@@ -298,10 +310,15 @@ function ManualMeetingModal({
             </label>
           </div>
 
-          {/* Manual transcription — only if no file */}
-          {!file && (
+          {/* Transcription field — always if no file, or if file is not .txt */}
+          {(!file || (file && !file.name.endsWith('.txt'))) && (
             <div>
-              <label className="text-xs font-medium block mb-1">Transcrição *</label>
+              <label className="text-xs font-medium block mb-1">
+                {file ? 'Cole a transcrição do documento *' : 'Transcrição *'}
+              </label>
+              {file && !file.name.endsWith('.txt') && (
+                <p className="text-[10px] text-warning mb-1">Arquivos .docx/.pdf precisam ter o texto colado manualmente.</p>
+              )}
               <Textarea value={descricao} onChange={e => setDescricao(e.target.value)}
                 placeholder="Cole a transcrição da reunião aqui..."
                 className="text-xs bg-secondary border-border min-h-[120px] resize-y" />
