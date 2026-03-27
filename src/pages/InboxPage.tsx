@@ -19,7 +19,7 @@ import BulkSendModal from '@/components/inbox/BulkSendModal';
 import {
   loadConversations, loadMessages, markConversationRead,
   sendTextMessage, sendMediaMessage, sendTemplateMessage,
-  uploadMediaToMeta, isWithin24hWindow,
+  uploadMediaToMeta, isWithin24hWindow, normalizePhone,
   type InboxConversation, type InboxMessage,
 } from '@/lib/metaInboxService';
 
@@ -68,18 +68,6 @@ function audioBufferToWav(audioBuffer: AudioBuffer): Blob {
   return new Blob([buf], { type: 'audio/wav' });
 }
 
-function normalizePhone(phone: string): string {
-  let p = phone.replace(/\D/g, '');
-  // 55 + DDD(2) + 8 digits → add 9 after DDD for mobile
-  if (p.length === 12 && p.startsWith('55')) {
-    const ddd = p.substring(2, 4);
-    const number = p.substring(4);
-    if (/^[6-9]/.test(number)) {
-      p = `55${ddd}9${number}`;
-    }
-  }
-  return p;
-}
 
 /* ── Format time ───────────────────────────────────────── */
 function formatTime(ts: string | number) {

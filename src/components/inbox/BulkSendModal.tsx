@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { sendTemplateMessage } from '@/lib/metaInboxService';
+import { sendTemplateMessage, normalizePhone } from '@/lib/metaInboxService';
 import { supabase } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
 import type { MetaInboxAccount } from '@/pages/InboxPage';
@@ -196,7 +196,7 @@ export default function BulkSendModal({
   const startProcessing = () => {
     // Build processed rows
     const rows: ProcessedRow[] = state.csvRows.map((row, i) => {
-      const phone = (row[state.phoneColumn] || '').replace(/\D/g, '');
+      const phone = normalizePhone(row[state.phoneColumn] || '');
       const params = Array.from({ length: state.templateParamCount }, (_, pi) => row[state.paramMapping[pi]] || '');
       return { index: i, phone, params, status: 'pending' as RowStatus };
     }).filter(r => r.phone && r.params.every(p => p)); // Remove rows with empty phone or params
@@ -350,9 +350,43 @@ export default function BulkSendModal({
     processingRef.current = false;
   };
 
-  const resetAll = () => {
+  const resetAll = async () => {
     processingRef.current = false;
     if (timerRef.current) clearTimeout(timerRef.current);
+
+    // Save log to DB before clearing
+    if (state.processedRows.length > 0 && state.templateName && account) {
+      try {
+        const empresaId = await getSaasEmpresaId();
+        const sent = state.processedRows.filter(r => ['sent', 'delivered', 'read'].includes(r.status)).length;
+        const failed = state.processedRows.filter(r => ['failed', 'fallback_failed'].includes(r.status)).length;
+        const delivered = state.processedRows.filter(r => r.status === 'delivered').length;
+        const read = state.processedRows.filter(r => r.status === 'read').length;
+        const fallbackSent = state.processedRows.filter(r => r.status === 'fallback_sent').length;
+
+        await (supabase as any).from('meta_bulk_send_logs').insert({
+          account_id: account.id,
+          empresa_id: empresaId,
+          template_name: state.templateName,
+          template_language: state.templateLanguage,
+          fallback_template: state.fallbackTemplateName || null,
+          total_rows: state.processedRows.length,
+          sent_count: sent,
+          delivered_count: delivered,
+          read_count: read,
+          failed_count: failed,
+          fallback_sent_count: fallbackSent,
+          rows_detail: state.processedRows.map(r => ({
+            phone: r.phone, status: r.status, error: r.error, wamid: r.wamid, params: r.params,
+          })),
+          finished_at: new Date().toISOString(),
+        });
+        toast({ title: 'Log salvo!', description: `${sent} enviados, ${failed} erros registrados.` });
+      } catch (e) {
+        console.error('[BulkSend] Failed to save log:', e);
+      }
+    }
+
     setState(EMPTY_STATE);
     localStorage.removeItem(STORAGE_KEY);
   };
@@ -492,7 +526,7 @@ export default function BulkSendModal({
                     })()}
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    → {(state.csvRows[0][state.phoneColumn] || '').replace(/\D/g, '')}
+                    → {normalizePhone(state.csvRows[0][state.phoneColumn] || '')}
                   </p>
                 </div>
               )}

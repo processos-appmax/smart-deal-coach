@@ -9,6 +9,19 @@ import type { MetaInboxAccount } from '@/pages/InboxPage';
 
 const META_API = 'https://graph.facebook.com/v19.0';
 
+// ─── Normalize Brazilian phone (ensure 9th digit for mobile) ────────────────
+export function normalizePhone(phone: string): string {
+  let p = phone.replace(/\D/g, '');
+  if (p.length === 12 && p.startsWith('55')) {
+    const ddd = p.substring(2, 4);
+    const number = p.substring(4);
+    if (/^[6-9]/.test(number)) {
+      p = `55${ddd}9${number}`;
+    }
+  }
+  return p;
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 export interface InboxConversation {
   id: string;
