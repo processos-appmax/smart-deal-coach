@@ -1,3 +1,8 @@
+// Polyfill: opus-media-recorder uses 'global' (Node.js) instead of 'window'
+if (typeof globalThis !== 'undefined' && typeof (globalThis as any).global === 'undefined') {
+  (globalThis as any).global = globalThis;
+}
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -637,33 +642,27 @@ export default function InboxPage() {
   const startRecording = async () => {
     if (!selectedAccount || !selectedConv) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 48000 } });
-
-      // Use OpusMediaRecorder polyfill to record REAL OGG/Opus
-      // (Chrome native MediaRecorder only outputs WebM which Meta rejects for voice)
-      const OpusMediaRecorder = (await import('opus-media-recorder')).default;
-      const mediaRecorder = new OpusMediaRecorder(
-        stream,
-        { mimeType: 'audio/ogg' },
-        { encoderWorkerFactory: () => new Worker('/encoderWorker.js'), OggOpusEncoderWasmPath: '/OggOpusEncoder.wasm' },
-      );
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
       audioChunksRef.current = [];
-      mediaRecorder.ondataavailable = (e: any) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/ogg' });
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         if (blob.size < 100) return;
         setSending(true);
         try {
-          // Upload real OGG/Opus to Meta via Edge Function proxy
-          const oggFile = new File([blob], 'audio.ogg', { type: 'audio/ogg' });
-          const upload = await uploadMediaToMeta(selectedAccount!, oggFile);
-          if (upload.error || !upload.mediaId) throw new Error(upload.error || 'Upload falhou');
+          // Upload WebM to Supabase Storage, send as document
+          // (Meta only delivers real OGG/Opus as voice — WebM is sent as audio file)
+          const fileName = `audio/${Date.now()}.webm`;
+          const { error: upErr } = await supabase.storage.from('inbox-media').upload(fileName, blob, { contentType: 'audio/webm', upsert: true });
+          if (upErr) throw new Error(upErr.message);
+          const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(fileName);
+          if (!urlData?.publicUrl) throw new Error('URL não disponível');
 
-          // Send as voice message (voice: true)
           const result = await sendMediaMessage(
             selectedAccount!, selectedConv!.id, selectedConv!.contact_phone,
-            'audio', upload.mediaId, undefined, undefined, true,
+            'document', urlData.publicUrl, 'Mensagem de voz', 'mensagem_de_voz.webm',
           );
           if (result.success) {
             const data = await loadMessages(selectedConv!.id);
