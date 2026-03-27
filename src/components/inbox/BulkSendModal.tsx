@@ -56,6 +56,7 @@ interface BulkSendState {
   fallbackTemplateId: string;
   fallbackTemplateName: string;
   fallbackTemplateLanguage: string;
+  fallbackTemplateBody: string;
   processedRows: ProcessedRow[];
   isProcessing: boolean;
   currentIndex: number;
@@ -75,6 +76,7 @@ const EMPTY_STATE: BulkSendState = {
   fallbackTemplateId: '',
   fallbackTemplateName: '',
   fallbackTemplateLanguage: '',
+  fallbackTemplateBody: '',
   processedRows: [],
   isProcessing: false,
   currentIndex: 0,
@@ -198,7 +200,8 @@ export default function BulkSendModal({
     const paramCount = (bodyText.match(/\{\{\d+\}\}/g) || []).length;
 
     if (isFallback) {
-      setState(s => ({ ...s, fallbackTemplateId: tmpl.id, fallbackTemplateName: tmpl.name, fallbackTemplateLanguage: tmpl.language }));
+      const fbBody = tmpl.components?.find((c: any) => c.type === 'BODY')?.text || '';
+      setState(s => ({ ...s, fallbackTemplateId: tmpl.id, fallbackTemplateName: tmpl.name, fallbackTemplateLanguage: tmpl.language, fallbackTemplateBody: fbBody }));
     } else {
       setState(s => ({
         ...s,
@@ -388,7 +391,9 @@ export default function BulkSendModal({
           empresa_id: empresaId,
           template_name: state.templateName,
           template_language: state.templateLanguage,
+          template_body: state.templateBody || null,
           fallback_template: state.fallbackTemplateName || null,
+          fallback_body: state.fallbackTemplateBody || null,
           total_rows: state.processedRows.length,
           sent_count: sent,
           delivered_count: delivered,
@@ -488,15 +493,34 @@ export default function BulkSendModal({
                 ← Voltar
               </Button>
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">{selectedLog.template_name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {new Date(selectedLog.created_at).toLocaleString('pt-BR')}
-                      {selectedLog.fallback_template && ` · Fallback: ${selectedLog.fallback_template}`}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-sm font-semibold">{selectedLog.template_name}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {new Date(selectedLog.created_at).toLocaleString('pt-BR')}
+                  </p>
                 </div>
+
+                {/* Template body */}
+                {selectedLog.template_body && (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-[9px] font-semibold text-primary uppercase tracking-wide mb-1">
+                      <LayoutTemplate className="w-3 h-3 inline mr-1" /> Template principal: {selectedLog.template_name}
+                    </p>
+                    <p className="text-xs whitespace-pre-wrap text-foreground/80">{selectedLog.template_body}</p>
+                  </div>
+                )}
+
+                {/* Fallback template */}
+                {selectedLog.fallback_template && (
+                  <div className="rounded-lg border border-warning/20 bg-warning/5 p-3">
+                    <p className="text-[9px] font-semibold text-warning uppercase tracking-wide mb-1">
+                      <RotateCcw className="w-3 h-3 inline mr-1" /> Template fallback: {selectedLog.fallback_template}
+                    </p>
+                    {selectedLog.fallback_body && (
+                      <p className="text-xs whitespace-pre-wrap text-foreground/80">{selectedLog.fallback_body}</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Stats */}
                 <div className="grid grid-cols-5 gap-2">
