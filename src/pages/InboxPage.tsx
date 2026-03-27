@@ -639,34 +639,30 @@ export default function InboxPage() {
     if (!selectedAccount || !selectedConv) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      // Use opus-media-recorder to record REAL OGG/Opus (Meta requires it for voice)
-      const { default: OpusMediaRecorder } = await import('opus-media-recorder');
-      const mediaRecorder = new OpusMediaRecorder(
-        stream,
-        { mimeType: 'audio/ogg' },
-        {
-          encoderWorkerFactory: () => new Worker('/encoderWorker.js'),
-          OggOpusEncoderWasmPath: '/OggOpusEncoder.wasm',
-        },
-      );
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
       audioChunksRef.current = [];
-      mediaRecorder.ondataavailable = (e: any) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/ogg' });
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         if (blob.size < 100) return;
         setSending(true);
         try {
-          // Upload real OGG/Opus via Edge Function proxy
-          const oggFile = new File([blob], 'audio.ogg', { type: 'audio/ogg' });
-          const upload = await uploadMediaToMeta(selectedAccount!, oggFile);
-          if (upload.error || !upload.mediaId) throw new Error(upload.error || 'Upload falhou');
+          // Send WebM to Python converter → converts to OGG/Opus → uploads to Meta
+          const converterUrl = import.meta.env.VITE_AUDIO_CONVERTER_URL || 'https://literate-space-carnival-x5jrwvrrxx97fx4p-8787.app.github.dev';
+          const formData = new FormData();
+          formData.append('file', new File([blob], 'audio.webm', { type: 'audio/webm' }));
+          formData.append('phone_number_id', selectedAccount!.phone_number_id);
+          formData.append('access_token', selectedAccount!.access_token);
+
+          const uploadRes = await fetch(`${converterUrl}/convert-and-upload`, { method: 'POST', body: formData });
+          const uploadData = await uploadRes.json();
+          if (uploadData.error || !uploadData.id) throw new Error(uploadData.error || 'Conversão falhou');
 
           // Send as voice message (voice: true = waveform appearance)
           const result = await sendMediaMessage(
             selectedAccount!, selectedConv!.id, selectedConv!.contact_phone,
-            'audio', upload.mediaId, undefined, undefined, true,
+            'audio', uploadData.id, undefined, undefined, true,
           );
           if (result.success) {
             const data = await loadMessages(selectedConv!.id);
