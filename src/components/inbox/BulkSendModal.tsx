@@ -678,21 +678,63 @@ export default function BulkSendModal({
               </div>
 
               {/* Controls */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {state.isProcessing ? (
-                  <Button size="sm" variant="outline" className="text-xs" onClick={pauseProcessing}>
-                    <Pause className="w-3 h-3 mr-1" /> Pausar
-                  </Button>
-                ) : state.step !== 'done' ? (
-                  <Button size="sm" className="text-xs" onClick={resumeProcessing}>
-                    <Play className="w-3 h-3 mr-1" /> Continuar
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" className="text-xs" onClick={pauseProcessing}>
+                      <Pause className="w-3 h-3 mr-1" /> Pausar
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs border-destructive/30 text-destructive" onClick={() => { pauseProcessing(); setState(s => ({ ...s, step: 'done' })); }}>
+                      <X className="w-3 h-3 mr-1" /> Parar
+                    </Button>
+                  </>
+                ) : state.step === 'process' ? (
+                  <>
+                    <Button size="sm" className="text-xs" onClick={resumeProcessing}>
+                      <Play className="w-3 h-3 mr-1" /> Continuar de onde parou
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs" onClick={() => {
+                      setState(s => ({
+                        ...s,
+                        processedRows: s.processedRows.map(r => ({ ...r, status: 'pending' as RowStatus, wamid: undefined, error: undefined })),
+                        currentIndex: 0,
+                        isProcessing: true,
+                      }));
+                    }}>
+                      <RotateCcw className="w-3 h-3 mr-1" /> Reiniciar do zero
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs border-destructive/30 text-destructive" onClick={() => setState(s => ({ ...s, step: 'done' }))}>
+                      <X className="w-3 h-3 mr-1" /> Parar definitivamente
+                    </Button>
+                  </>
                 ) : null}
 
-                {state.step === 'done' && stats.failed > 0 && state.fallbackTemplateName && (
-                  <Button size="sm" variant="outline" className="text-xs" onClick={processFallback}>
-                    <RotateCcw className="w-3 h-3 mr-1" /> Reprocessar erros com {state.fallbackTemplateName}
-                  </Button>
+                {state.step === 'done' && (
+                  <>
+                    {stats.pending > 0 && (
+                      <Button size="sm" className="text-xs" onClick={() => setState(s => ({ ...s, step: 'process', isProcessing: true }))}>
+                        <Play className="w-3 h-3 mr-1" /> Retomar de onde parou ({stats.pending} restantes)
+                      </Button>
+                    )}
+                    {stats.failed > 0 && state.fallbackTemplateName && (
+                      <Button size="sm" variant="outline" className="text-xs" onClick={processFallback}>
+                        <RotateCcw className="w-3 h-3 mr-1" /> Reprocessar erros com {state.fallbackTemplateName}
+                      </Button>
+                    )}
+                    {stats.failed > 0 && !state.fallbackTemplateName && (
+                      <Button size="sm" variant="outline" className="text-xs" onClick={() => {
+                        setState(s => ({
+                          ...s,
+                          step: 'process',
+                          processedRows: s.processedRows.map(r => r.status === 'failed' ? { ...r, status: 'pending' as RowStatus, error: undefined } : r),
+                          currentIndex: s.processedRows.findIndex(r => r.status === 'failed'),
+                          isProcessing: true,
+                        }));
+                      }}>
+                        <RotateCcw className="w-3 h-3 mr-1" /> Retentar {stats.failed} com erro
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
 
