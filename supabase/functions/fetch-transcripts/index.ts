@@ -189,7 +189,7 @@ serve(async (req) => {
         }
       } catch (e) {
         errors++;
-        errorDetails.push(`${meeting.id} (file: ${meeting.transcript_file_id}): ${e.message}`);
+        errorDetails.push(`${meeting.id} (file: ${meeting.transcript_file_id}): ${(e as Error).message}`);
       }
     }
 
@@ -206,7 +206,7 @@ serve(async (req) => {
   } catch (err) {
     console.error('fetch-transcripts error:', err);
     return new Response(
-      JSON.stringify({ error: err.message || 'Erro interno' }),
+      JSON.stringify({ error: (err as Error).message || 'Erro interno' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }

@@ -69,7 +69,7 @@ export async function loadTeams(): Promise<Team[]> {
   }
 
   // Resolve supervisor UUIDs to frontend IDs
-  const supervisorUuids = [...new Set((data || []).map((t: any) => t.supervisor_id).filter(Boolean))];
+  const supervisorUuids: string[] = [...new Set((data || []).map((t: any) => t.supervisor_id).filter(Boolean))] as string[];
   const supervisorMap: Record<string, string> = {};
   for (const uuid of supervisorUuids) {
     supervisorMap[uuid] = await resolveUuidToFrontendId(uuid, empresaId);
