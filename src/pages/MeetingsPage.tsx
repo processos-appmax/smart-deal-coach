@@ -18,6 +18,7 @@ import {
 } from '@/lib/meetingsService';
 import { loadAllEvaluationsForEntity, type StoredEvaluation } from '@/lib/evaluationService';
 import { evaluateMeetingMultiAgent } from '@/lib/multiAgentEvaluation';
+import { supabase } from '@/integrations/supabase/client';
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   concluida: { label: 'Concluída', class: 'score-good' },
@@ -661,7 +662,7 @@ export default function MeetingsPage() {
                             <Calendar className="w-3 h-3" />
                             {new Date(m.data_reuniao).toLocaleDateString('pt-BR')}
                             <span className="ml-1 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />{m.duracao_minutos > 0 ? `${m.duracao_minutos}min` : '—'}
+                              <Clock className="w-3 h-3" />{`${m.duracao_minutos || 0}min`}
                             </span>
                           </div>
                         </td>
@@ -675,7 +676,21 @@ export default function MeetingsPage() {
                           )}
                         </td>
                         <td className="text-center">
-                          <span className={statusCfg.class}>{statusCfg.label}</span>
+                          <select
+                            value={m.status}
+                            onClick={e => e.stopPropagation()}
+                            onChange={async (e) => {
+                              const newStatus = e.target.value;
+                              await (supabase as any).schema('saas').from('reunioes').update({ status: newStatus }).eq('id', m.id);
+                              await loadMeetings();
+                            }}
+                            className={cn('text-[11px] px-2 py-0.5 rounded-full border font-medium bg-transparent cursor-pointer appearance-none text-center',
+                              STATUS_CONFIG[m.status]?.class || ''
+                            )}
+                          >
+                            <option value="concluida">Concluída</option>
+                            <option value="no_show">No-show</option>
+                          </select>
                         </td>
                         <td className="text-center hidden lg:table-cell">
                           {m.transcricao ? (
@@ -791,7 +806,7 @@ export default function MeetingsPage() {
                   </div>
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Clock className="w-3 h-3" />
-                    {selectedMeeting.duracao_minutos > 0 ? `${selectedMeeting.duracao_minutos} min` : '—'}
+                    {`${selectedMeeting.duracao_minutos || 0} min`}
                   </div>
                 </div>
                 {selectedMeeting.link_meet && (
