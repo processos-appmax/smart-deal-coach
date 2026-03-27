@@ -648,16 +648,10 @@ export default function InboxPage() {
         if (blob.size < 100) return;
         setSending(true);
         try {
-          // Convert WebM → WAV, upload via Edge Function (converts to OGG/Opus server-side)
-          const arrayBuffer = await blob.arrayBuffer();
-          const audioCtx = new AudioContext();
-          const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-          const wavBlob = audioBufferToWav(decoded);
-          audioCtx.close();
-
-          // Upload WAV declared as audio/ogg (Meta validates mime, not container)
-          const wavFile = new File([wavBlob], 'audio.ogg', { type: 'audio/ogg' });
-          const upload = await uploadMediaToMeta(selectedAccount!, wavFile);
+          // Send WebM blob directly as audio/ogg — Chrome WebM uses Opus codec
+          // Meta accepts Opus payload when mime declares audio/ogg (tested & confirmed)
+          const oggFile = new File([blob], 'audio.ogg', { type: 'audio/ogg' });
+          const upload = await uploadMediaToMeta(selectedAccount!, oggFile);
           if (upload.error || !upload.mediaId) throw new Error(upload.error || 'Upload falhou');
 
           // Send as voice message (voice: true for voice note appearance)
