@@ -64,10 +64,10 @@ async function audioBufferToMp3(audioBuffer: AudioBuffer): Promise<Blob> {
   for (let i = 0; i < int16.length; i += blockSize) {
     const chunk = int16.subarray(i, i + blockSize);
     const mp3buf = encoder.encodeBuffer(chunk);
-    if (mp3buf.length > 0) mp3Data.push(new Int8Array(mp3buf));
+    if (mp3buf.length > 0) mp3Data.push(new Int8Array(mp3buf) as unknown as BlobPart);
   }
   const end = encoder.flush();
-  if (end.length > 0) mp3Data.push(new Int8Array(end));
+  if (end.length > 0) mp3Data.push(new Int8Array(end) as unknown as BlobPart);
 
   return new Blob(mp3Data, { type: 'audio/mpeg' });
 }

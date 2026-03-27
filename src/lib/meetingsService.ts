@@ -108,7 +108,7 @@ export async function triggerTranscriptionFetch(): Promise<{ queued: number; ok:
 
   if (error) throw new Error(`Failed to list pending meetings: ${error.message}`);
 
-  const conferenceKeys = [...new Set((data || []).map((r: any) => String(r.google_event_id || '').trim()).filter(Boolean))];
+  const conferenceKeys: string[] = [...new Set((data || []).map((r: any) => String(r.google_event_id || '').trim()).filter(Boolean))];
   if (conferenceKeys.length === 0) return { queued: 0, ok: 0, fail: 0 };
 
   let ok = 0;

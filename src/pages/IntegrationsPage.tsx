@@ -9,7 +9,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { assignInstanceToUser, getInstanceForUserFromList, type EvolutionInstance } from '@/hooks/useEvolutionInstances';
+import { assignInstanceToUser, getInstanceForUserFromList, type EvolutionInstance as EvoInstance } from '@/hooks/useEvolutionInstances';
 import { loadAllowedUsers } from '@/lib/accessControl';
 import { supabase, supabaseSaas } from '@/integrations/supabase/client';
 import { getSaasEmpresaId } from '@/lib/saas';
@@ -130,7 +130,7 @@ function EvolutionPanel() {
       // Load from DB first for instant display
       try {
         const empresaId = await getSaasEmpresaId();
-        const { data: dbData } = await supabase
+        const { data: dbData } = await (supabase as any)
           .schema('saas')
           .from('instancias_whatsapp')
           .select('id,nome,telefone,status,owner_jid,usuario_id')
@@ -592,11 +592,11 @@ function DatabasePanel() {
       const empresaId = await getSaasEmpresaId();
 
       const [intRes, tokRes] = await Promise.all([
-        supabaseSaas.schema('saas').from('integracoes')
+        (supabaseSaas as any).schema('saas').from('integracoes')
           .select('id,tipo,nome,status,configuracao,conectado_em')
           .eq('empresa_id', empresaId)
           .order('tipo', { ascending: true }),
-        supabaseSaas.schema('saas').from('tokens_ia_modulo')
+        (supabaseSaas as any).schema('saas').from('tokens_ia_modulo')
           .select('id,modulo_codigo,provedor,modelo,ativo')
           .eq('empresa_id', empresaId)
           .order('modulo_codigo', { ascending: true }),
