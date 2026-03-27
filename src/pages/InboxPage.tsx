@@ -105,6 +105,82 @@ function MsgStatusIcon({ status }: { status: string }) {
 }
 
 /* ── New conversation dialog (with template + params) ─── */
+/* ── Audio Player with lazy URL fetching ────────────── */
+function AudioPlayer({ mediaUrl, mediaId, fromMe, account }: {
+  mediaUrl: string | null;
+  mediaId: string | null;
+  fromMe: boolean;
+  account: MetaInboxAccount | null;
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [audioSrc, setAudioSrc] = useState(mediaUrl || '');
+  const [loading, setLoading] = useState(false);
+
+  const handlePlay = async () => {
+    // If we have a src, just toggle play/pause
+    if (audioSrc && audioRef.current) {
+      if (audioRef.current.paused) { audioRef.current.play(); setPlaying(true); }
+      else { audioRef.current.pause(); setPlaying(false); }
+      return;
+    }
+
+    // Fetch media via proxy Edge Function (avoids CORS)
+    if (mediaId && account?.access_token) {
+      setLoading(true);
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lwusznsduxcqjjmbbobt.supabase.co';
+        const proxyUrl = `${supabaseUrl}/functions/v1/meta-download-media?media_id=${mediaId}&access_token=${encodeURIComponent(account.access_token)}`;
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          setAudioSrc(blobUrl);
+          setTimeout(() => {
+            if (audioRef.current) { audioRef.current.play(); setPlaying(true); }
+          }, 100);
+        }
+      } catch (err) {
+        console.error('[AudioPlayer] Failed to fetch media:', err);
+      }
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className={cn('flex items-center gap-2 rounded-full px-3 py-1.5 min-w-[200px]',
+      fromMe ? 'bg-white/10' : 'bg-muted/50'
+    )}>
+      <button
+        className={cn('w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
+          fromMe ? 'bg-white/20 text-primary-foreground' : 'bg-primary/20 text-primary'
+        )}
+        onClick={handlePlay}
+        disabled={loading}
+      >
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : playing ? (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 ml-0.5"><path d="M8 5v14l11-7z"/></svg>
+        )}
+      </button>
+      <div className="flex items-center gap-[2px] flex-1 h-6">
+        {Array.from({ length: 28 }, (_, i) => (
+          <div key={i} className={cn('w-[3px] rounded-full', fromMe ? 'bg-white/40' : 'bg-primary/40')}
+            style={{ height: `${Math.max(3, (Math.sin(i * 0.7) * 0.5 + 0.5) * 20)}px` }} />
+        ))}
+      </div>
+      <Mic className={cn('w-4 h-4 flex-shrink-0', fromMe ? 'text-white/50' : 'text-primary/50')} />
+      {audioSrc && (
+        <audio ref={audioRef} src={audioSrc} preload="metadata" className="hidden"
+          onEnded={() => setPlaying(false)} onPause={() => setPlaying(false)} />
+      )}
+    </div>
+  );
+}
+
 function NewConversationDialog({
   open, onClose, account, onSent,
 }: {
@@ -844,31 +920,12 @@ export default function InboxPage() {
                     {/* Audio — WhatsApp style */}
                     {(msg.msg_type === 'audio' || msg.msg_type === 'ptt') && (
                       <div className="px-3 py-2">
-                        <div className={cn('flex items-center gap-2 rounded-full px-3 py-1.5 min-w-[200px]',
-                          msg.from_me ? 'bg-white/10' : 'bg-muted/50'
-                        )}>
-                          <button
-                            className={cn('w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                              msg.from_me ? 'bg-white/20 text-primary-foreground' : 'bg-primary/20 text-primary'
-                            )}
-                            onClick={(e) => {
-                              const audio = (e.currentTarget.parentElement?.querySelector('audio') as HTMLAudioElement);
-                              if (audio) { audio.paused ? audio.play() : audio.pause(); }
-                            }}
-                          >
-                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 ml-0.5"><path d="M8 5v14l11-7z"/></svg>
-                          </button>
-                          {/* Waveform bars (visual only) */}
-                          <div className="flex items-center gap-[2px] flex-1 h-6">
-                            {Array.from({ length: 28 }, (_, i) => {
-                              const h = Math.sin(i * 0.7) * 0.5 + Math.random() * 0.5;
-                              return <div key={i} className={cn('w-[3px] rounded-full', msg.from_me ? 'bg-white/40' : 'bg-primary/40')}
-                                style={{ height: `${Math.max(3, h * 20)}px` }} />;
-                            })}
-                          </div>
-                          <Mic className={cn('w-4 h-4 flex-shrink-0', msg.from_me ? 'text-white/50' : 'text-primary/50')} />
-                          {msg.media_url && <audio src={msg.media_url} preload="metadata" className="hidden" />}
-                        </div>
+                        <AudioPlayer
+                          mediaUrl={msg.media_url}
+                          mediaId={msg.media_id}
+                          fromMe={msg.from_me}
+                          account={selectedAccount}
+                        />
                       </div>
                     )}
                     {/* Document */}
