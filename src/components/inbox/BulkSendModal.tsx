@@ -136,6 +136,8 @@ export default function BulkSendModal({
   });
   const [templates, setTemplates] = useState<any[]>([]);
   const [loadingTpl, setLoadingTpl] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const processingRef = useRef(false);
   const timerRef = useRef<number | null>(null);
 
@@ -143,6 +145,23 @@ export default function BulkSendModal({
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  // Load logs
+  const loadLogs = useCallback(async () => {
+    if (!account) return;
+    const empresaId = await getSaasEmpresaId();
+    const { data } = await (supabase as any)
+      .from('meta_bulk_send_logs')
+      .select('*')
+      .eq('empresa_id', empresaId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    setLogs(data || []);
+  }, [account?.id]);
+
+  useEffect(() => {
+    if (open && state.step === 'upload') loadLogs();
+  }, [open, state.step, loadLogs]);
 
   // Load templates
   useEffect(() => {
@@ -417,21 +436,112 @@ export default function BulkSendModal({
 
         <div className="flex-1 overflow-y-auto space-y-4 pt-2">
 
-          {/* ═══ STEP 1: Upload CSV ═══ */}
-          {state.step === 'upload' && (
+          {/* ═══ STEP 1: Upload CSV + History ═══ */}
+          {state.step === 'upload' && !selectedLog && (
             <div className="space-y-4">
-              <label className="flex flex-col items-center gap-3 p-8 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 cursor-pointer transition-all">
-                <Upload className="w-8 h-8 text-muted-foreground" />
+              <label className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 cursor-pointer transition-all">
+                <Upload className="w-7 h-7 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Clique para enviar um arquivo CSV</span>
                 <span className="text-[10px] text-muted-foreground/60">Separadores aceitos: vírgula, ponto-e-vírgula, tab</span>
                 <input type="file" accept=".csv,.txt" className="hidden" onChange={handleFileUpload} />
               </label>
 
               {state.processedRows.length > 0 && (
-                <Button variant="outline" className="w-full" onClick={() => setState(s => ({ ...s, step: 'process' }))}>
+                <Button variant="outline" className="w-full text-xs" onClick={() => setState(s => ({ ...s, step: 'process' }))}>
                   Voltar ao processamento anterior ({stats.sent} enviados, {stats.failed} erros)
                 </Button>
               )}
+
+              {/* History */}
+              {logs.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Histórico de disparos</p>
+                  <div className="space-y-1.5">
+                    {logs.map(log => {
+                      const status = log.sent_count >= log.total_rows ? 'Concluído' : log.failed_count > 0 ? 'Com erros' : 'Em andamento';
+                      const statusCls = status === 'Concluído' ? 'text-green-500' : status === 'Com erros' ? 'text-warning' : 'text-primary';
+                      return (
+                        <button key={log.id} onClick={() => setSelectedLog(log)}
+                          className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate">{log.template_name}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {new Date(log.created_at).toLocaleDateString('pt-BR')} · {new Date(log.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                          <span className={cn('text-[10px] font-medium', statusCls)}>{status}</span>
+                          <span className="text-xs font-mono text-muted-foreground">{log.sent_count}/{log.total_rows}</span>
+                          <ChevronDown className="w-3 h-3 text-muted-foreground -rotate-90" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ Log detail view ═══ */}
+          {state.step === 'upload' && selectedLog && (
+            <div className="space-y-4">
+              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setSelectedLog(null)}>
+                ← Voltar
+              </Button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">{selectedLog.template_name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {new Date(selectedLog.created_at).toLocaleString('pt-BR')}
+                      {selectedLog.fallback_template && ` · Fallback: ${selectedLog.fallback_template}`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { label: 'Total', value: selectedLog.total_rows, cls: 'text-foreground' },
+                    { label: 'Enviados', value: selectedLog.sent_count, cls: 'text-blue-500' },
+                    { label: 'Entregues', value: selectedLog.delivered_count, cls: 'text-green-500' },
+                    { label: 'Lidos', value: selectedLog.read_count, cls: 'text-green-600' },
+                    { label: 'Erros', value: selectedLog.failed_count, cls: 'text-destructive' },
+                  ].map(s => (
+                    <div key={s.label} className="text-center p-2 rounded-lg bg-secondary border border-border">
+                      <p className={cn('text-lg font-bold', s.cls)}>{s.value}</p>
+                      <p className="text-[9px] text-muted-foreground">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Rows detail */}
+                {Array.isArray(selectedLog.rows_detail) && selectedLog.rows_detail.length > 0 && (
+                  <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-border">
+                    <table className="w-full text-xs">
+                      <thead className="bg-secondary sticky top-0">
+                        <tr>
+                          <th className="text-left px-3 py-2">#</th>
+                          <th className="text-left px-3 py-2">Telefone</th>
+                          <th className="text-left px-3 py-2">Parâmetros</th>
+                          <th className="text-center px-3 py-2">Status</th>
+                          <th className="text-left px-3 py-2">Erro</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedLog.rows_detail.map((row: any, i: number) => (
+                          <tr key={i} className="border-t border-border/50">
+                            <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
+                            <td className="px-3 py-1.5 font-mono">{row.phone}</td>
+                            <td className="px-3 py-1.5 text-muted-foreground truncate max-w-[200px]">{(row.params || []).join(', ')}</td>
+                            <td className="px-3 py-1.5 text-center"><StatusBadge status={row.status} /></td>
+                            <td className="px-3 py-1.5 text-destructive truncate max-w-[150px]">{row.error || ''}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
