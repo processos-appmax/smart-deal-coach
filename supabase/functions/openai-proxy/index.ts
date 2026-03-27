@@ -52,7 +52,7 @@ serve(async (req) => {
     });
   } catch (e) {
     return new Response(
-      JSON.stringify({ error: e.message || 'Erro interno no proxy' }),
+      JSON.stringify({ error: (e as Error).message || 'Erro interno no proxy' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
