@@ -37,6 +37,7 @@ interface ProcessedRow {
   phone: string;
   params: string[];
   status: RowStatus;
+  templateUsed?: string; // which template was actually sent
   wamid?: string;
   error?: string;
   sentAt?: string;
@@ -57,6 +58,7 @@ interface BulkSendState {
   fallbackTemplateName: string;
   fallbackTemplateLanguage: string;
   fallbackTemplateBody: string;
+  sendMode: 'single' | 'random'; // single = only main, random = alternate between main + fallback
   processedRows: ProcessedRow[];
   isProcessing: boolean;
   currentIndex: number;
@@ -77,6 +79,7 @@ const EMPTY_STATE: BulkSendState = {
   fallbackTemplateName: '',
   fallbackTemplateLanguage: '',
   fallbackTemplateBody: '',
+  sendMode: 'single',
   processedRows: [],
   isProcessing: false,
   currentIndex: 0,
@@ -269,6 +272,20 @@ export default function BulkSendModal({
       convId = created?.id;
     }
 
+    // Determine which template to use
+    const templates2 = [
+      { name: currentState.templateName, language: currentState.templateLanguage, body: currentState.templateBody },
+    ];
+    if (currentState.fallbackTemplateName) {
+      templates2.push({ name: currentState.fallbackTemplateName, language: currentState.fallbackTemplateLanguage, body: currentState.fallbackTemplateBody });
+    }
+
+    // Pick template: random mode alternates, single mode always uses first
+    const tplIndex = currentState.sendMode === 'random' && templates2.length > 1
+      ? idx % templates2.length
+      : 0;
+    let chosenTpl = templates2[tplIndex];
+
     // Build components
     const components: any[] = [];
     if (row.params.length > 0) {
@@ -278,22 +295,46 @@ export default function BulkSendModal({
       });
     }
 
-    // Render body
-    let renderedBody = currentState.templateBody;
+    let renderedBody = chosenTpl.body;
     row.params.forEach((v, i) => { renderedBody = renderedBody.replace(`{{${i + 1}}}`, v); });
 
-    // Send
-    const result = await sendTemplateMessage(
+    // Send with chosen template
+    let result = await sendTemplateMessage(
       account, convId || '', row.phone,
-      currentState.templateName, currentState.templateLanguage,
+      chosenTpl.name, chosenTpl.language,
       components, renderedBody,
     );
+
+    let templateUsed = chosenTpl.name;
+    let finalStatus: RowStatus = result.success ? 'sent' : 'failed';
+
+    // If failed and there's another template, auto-retry with the other one
+    if (!result.success && templates2.length > 1) {
+      const otherTpl = templates2[tplIndex === 0 ? 1 : 0];
+      let otherBody = otherTpl.body;
+      row.params.forEach((v, i) => { otherBody = otherBody.replace(`{{${i + 1}}}`, v); });
+
+      const retryResult = await sendTemplateMessage(
+        account, convId || '', row.phone,
+        otherTpl.name, otherTpl.language,
+        components, otherBody,
+      );
+
+      if (retryResult.success) {
+        result = retryResult;
+        templateUsed = otherTpl.name;
+        finalStatus = 'fallback_sent';
+      } else {
+        finalStatus = 'fallback_failed';
+      }
+    }
 
     setState(prev => {
       const rows = [...prev.processedRows];
       rows[idx] = {
         ...rows[idx],
-        status: result.success ? 'sent' : 'failed',
+        status: finalStatus,
+        templateUsed,
         wamid: result.wamid,
         error: result.error,
         sentAt: new Date().toISOString(),
@@ -401,7 +442,7 @@ export default function BulkSendModal({
           failed_count: failed,
           fallback_sent_count: fallbackSent,
           rows_detail: state.processedRows.map(r => ({
-            phone: r.phone, status: r.status, error: r.error, wamid: r.wamid, params: r.params,
+            phone: r.phone, status: r.status, error: r.error, wamid: r.wamid, params: r.params, templateUsed: r.templateUsed,
           })),
           finished_at: new Date().toISOString(),
         });
@@ -546,6 +587,7 @@ export default function BulkSendModal({
                         <tr>
                           <th className="text-left px-3 py-2">#</th>
                           <th className="text-left px-3 py-2">Telefone</th>
+                          <th className="text-left px-3 py-2">Template</th>
                           <th className="text-left px-3 py-2">Parâmetros</th>
                           <th className="text-center px-3 py-2">Status</th>
                           <th className="text-left px-3 py-2">Erro</th>
@@ -556,6 +598,7 @@ export default function BulkSendModal({
                           <tr key={i} className="border-t border-border/50">
                             <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
                             <td className="px-3 py-1.5 font-mono">{row.phone}</td>
+                            <td className="px-3 py-1.5 text-[10px] font-mono text-muted-foreground">{row.templateUsed || '—'}</td>
                             <td className="px-3 py-1.5 text-muted-foreground truncate max-w-[200px]">{(row.params || []).join(', ')}</td>
                             <td className="px-3 py-1.5 text-center"><StatusBadge status={row.status} /></td>
                             <td className="px-3 py-1.5 text-destructive truncate max-w-[150px]">{row.error || ''}</td>
@@ -633,15 +676,35 @@ export default function BulkSendModal({
               {/* Fallback template */}
               {state.templateName && (
                 <div>
-                  <label className="text-xs font-medium block mb-1.5">Template alternativo (para erros)</label>
+                  <label className="text-xs font-medium block mb-1.5">Template alternativo</label>
                   <select
                     value={state.fallbackTemplateId}
-                    onChange={e => { const t = templates.find(t => t.id === e.target.value); if (t) selectTemplate(t, true); }}
+                    onChange={e => { const t = templates.find(t => t.id === e.target.value); if (t) selectTemplate(t, true); else setState(s => ({ ...s, fallbackTemplateId: '', fallbackTemplateName: '', fallbackTemplateLanguage: '', fallbackTemplateBody: '', sendMode: 'single' })); }}
                     className="w-full h-9 text-sm bg-secondary border border-border rounded-md px-3"
                   >
                     <option value="">Nenhum (opcional)</option>
                     {templates.filter(t => t.id !== state.templateId).map(t => <option key={t.id} value={t.id}>{t.name} ({t.language})</option>)}
                   </select>
+                </div>
+              )}
+
+              {/* Send mode selector */}
+              {state.fallbackTemplateName && (
+                <div>
+                  <label className="text-xs font-medium block mb-1.5">Modo de envio</label>
+                  <div className="flex gap-2">
+                    {([
+                      { key: 'single', label: 'Principal + fallback se erro', desc: 'Envia o principal. Se falhar, tenta o alternativo.' },
+                      { key: 'random', label: 'Aleatório (1 de cada)', desc: 'Alterna entre os dois templates. Se falhar, tenta o outro.' },
+                    ] as const).map(m => (
+                      <button key={m.key} onClick={() => setState(s => ({ ...s, sendMode: m.key }))}
+                        className={cn('flex-1 p-3 rounded-lg border text-left transition-all',
+                          state.sendMode === m.key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30')}>
+                        <p className="text-xs font-medium">{m.label}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{m.desc}</p>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -769,6 +832,7 @@ export default function BulkSendModal({
                     <tr>
                       <th className="text-left px-3 py-2 w-8">#</th>
                       <th className="text-left px-3 py-2">Telefone</th>
+                      <th className="text-left px-3 py-2">Template</th>
                       <th className="text-left px-3 py-2">Parâmetros</th>
                       <th className="text-center px-3 py-2">Status</th>
                       <th className="text-left px-3 py-2">Erro</th>
@@ -779,6 +843,7 @@ export default function BulkSendModal({
                       <tr key={i} className={cn('border-t border-border/50', row.status === 'sending' && 'bg-primary/5')}>
                         <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
                         <td className="px-3 py-1.5 font-mono">{row.phone}</td>
+                        <td className="px-3 py-1.5 text-[10px] font-mono text-muted-foreground">{row.templateUsed || '—'}</td>
                         <td className="px-3 py-1.5 text-muted-foreground truncate max-w-[200px]">{row.params.join(', ')}</td>
                         <td className="px-3 py-1.5 text-center"><StatusBadge status={row.status} /></td>
                         <td className="px-3 py-1.5 text-destructive truncate max-w-[150px]">{row.error || ''}</td>
