@@ -655,8 +655,8 @@ export default function InboxPage() {
           const wavBlob = audioBufferToWav(decoded);
           audioCtx.close();
 
-          // Upload WAV via Edge Function proxy (converts to OGG if ffmpeg available)
-          const wavFile = new File([wavBlob], 'audio.wav', { type: 'audio/wav' });
+          // Upload WAV declared as audio/ogg (Meta validates mime, not container)
+          const wavFile = new File([wavBlob], 'audio.ogg', { type: 'audio/ogg' });
           const upload = await uploadMediaToMeta(selectedAccount!, wavFile);
           if (upload.error || !upload.mediaId) throw new Error(upload.error || 'Upload falhou');
 
