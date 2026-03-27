@@ -677,17 +677,18 @@ export default function MeetingsPage() {
                         </td>
                         <td className="text-center">
                           <select
-                            value={m.status}
+                            value={m.status || ''}
                             onClick={e => e.stopPropagation()}
                             onChange={async (e) => {
                               const newStatus = e.target.value;
-                              await (supabase as any).schema('saas').from('reunioes').update({ status: newStatus }).eq('id', m.id);
+                              await (supabase as any).schema('saas').from('reunioes').update({ status: newStatus || null }).eq('id', m.id);
                               await loadMeetings();
                             }}
                             className={cn('text-[11px] px-2 py-0.5 rounded-full border font-medium bg-transparent cursor-pointer appearance-none text-center',
-                              STATUS_CONFIG[m.status]?.class || ''
+                              m.status ? (STATUS_CONFIG[m.status]?.class || '') : 'text-muted-foreground border-border'
                             )}
                           >
+                            <option value="">—</option>
                             <option value="concluida">Concluída</option>
                             <option value="no_show">No-show</option>
                           </select>
