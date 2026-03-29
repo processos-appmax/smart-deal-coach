@@ -15,6 +15,11 @@ import { CONFIG } from '@/lib/config';
 const ALLOWED_DOMAIN = CONFIG.GOOGLE_ALLOWED_DOMAIN;
 const SESSION_KEY = 'appmax_session';
 
+/** Returns the default landing page for a given role */
+export function getDefaultRoute(role?: UserRole): string {
+  return role === 'support' ? '/inbox' : '/dashboard';
+}
+
 export function isAppmaxEmail(email: string): boolean {
   return email.trim().toLowerCase().endsWith(`@${ALLOWED_DOMAIN}`);
 }
@@ -82,13 +87,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { canAccess: roleCanAccess } = useRolePermissions();
   const { addEvent } = useAuditLog();
 
-  // Restore session on mount
+  // Restore session on mount — re-validate role from DB to catch admin changes
   useEffect(() => {
     const restored = loadSession();
-    if (restored) {
-      setUser(restored);
+    if (!restored) {
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+    setUser(restored);
+    // Background refresh: fetch current role/data from DB
+    getAllowedUserByEmail(restored.email)
+      .then(match => {
+        if (!match) {
+          // User deactivated or removed — force logout
+          clearSession();
+          setUser(null);
+          return;
+        }
+        if (match.role !== restored.role || match.areaId !== restored.areaId || match.teamId !== restored.teamId) {
+          const refreshed = buildUser(
+            restored.id,
+            match.email,
+            match.name,
+            match.role,
+            restored.avatar,
+            match.areaId,
+            match.teamId,
+          );
+          setUser(refreshed);
+          saveSession(refreshed);
+        }
+      })
+      .catch(() => { /* keep cached session on network error */ })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const recordLogin = (u: User) => {

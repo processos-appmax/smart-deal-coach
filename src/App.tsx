@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GoogleOAuthProvider } from "@react-oauth/google";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth, getDefaultRoute } from "@/contexts/AuthContext";
 import { AppConfigProvider } from "@/contexts/AppConfigContext";
 import { RolePermissionsProvider } from "@/contexts/RolePermissionsContext";
 import { AuditLogProvider } from "@/contexts/AuditLogContext";
@@ -36,7 +36,7 @@ export const GOOGLE_CLIENT_ID = CONFIG.GOOGLE_CLIENT_ID;
 const queryClient = new QueryClient();
 
 function ProtectedRoutes() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -68,7 +68,7 @@ function ProtectedRoutes() {
         <Route path="/admin"        element={<AdminPage />} />
         <Route path="/performance"  element={<PerformancePage />} />
         <Route path="/me"           element={<MyProfilePage />} />
-        <Route path="/"             element={<Navigate to="/dashboard" replace />} />
+        <Route path="/"             element={<Navigate to={getDefaultRoute(user?.role)} replace />} />
         <Route path="*"             element={<NotFound />} />
       </Route>
     </Routes>
@@ -106,8 +106,8 @@ const App = () => (
 );
 
 function LoginPageWrapper() {
-  const { isAuthenticated } = useAuth();
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  const { isAuthenticated, user } = useAuth();
+  if (isAuthenticated) return <Navigate to={getDefaultRoute(user?.role)} replace />;
   return <LoginPage />;
 }
 

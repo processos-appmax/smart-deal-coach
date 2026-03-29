@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, getDefaultRoute } from '@/contexts/AuthContext';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { GOOGLE_CLIENT_ID } from '@/App';
@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Eye, EyeOff, Mail, Lock, BarChart3, MessageSquare, Brain, ShieldCheck } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, user } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,7 +50,7 @@ export default function LoginPage() {
         if (!res.ok) throw new Error('Falha ao buscar dados do Google.');
         const info = await res.json();
         await loginWithGoogle({ email: info.email, name: info.name, picture: info.picture });
-        navigate('/dashboard', { replace: true });
+        // LoginPageWrapper handles the redirect based on role
       } catch (err: any) {
         setError(err?.message ?? 'Falha na autenticação com Google.');
       } finally {

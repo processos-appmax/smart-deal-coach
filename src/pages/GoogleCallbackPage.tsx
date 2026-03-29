@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, getDefaultRoute } from '@/contexts/AuthContext';
 
 export default function GoogleCallbackPage() {
   const navigate = useNavigate();
@@ -33,7 +33,7 @@ export default function GoogleCallbackPage() {
           if (!res.ok) throw new Error('Falha ao buscar dados do Google.');
           const info = await res.json();
           await loginWithGoogle({ email: info.email, name: info.name, picture: info.picture });
-          navigate('/dashboard', { replace: true });
+          navigate('/login', { replace: true });
           return;
         }
 
