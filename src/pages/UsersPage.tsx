@@ -38,6 +38,7 @@ const ROLE_CONFIG: Record<UserRole, { label: string; class: string }> = {
   coordinator: { label: 'Coordenador',  class: 'bg-warning/10 text-warning border-warning/20' },
   supervisor:  { label: 'Supervisor',   class: 'bg-success/10 text-success border-success/20' },
   member:      { label: 'Analista',     class: 'bg-muted text-muted-foreground border-border' },
+  support:     { label: 'Suporte',     class: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
 };
 
 // ─── Create user modal ────────────────────────────────────────────────────────
@@ -82,6 +83,7 @@ function CreateUserModal({ onClose, onCreate }: { onClose: () => void; onCreate:
             <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
               <SelectTrigger className="h-9 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-card border-border">
+                <SelectItem value="support"     className="text-xs">Suporte</SelectItem>
                 <SelectItem value="member"      className="text-xs">Analista</SelectItem>
                 <SelectItem value="supervisor"  className="text-xs">Supervisor</SelectItem>
                 <SelectItem value="coordinator" className="text-xs">Coordenador</SelectItem>
@@ -140,6 +142,7 @@ function ChangeRoleModal({ user, onClose, onSave }: { user: User; onClose: () =>
             <Select value={role} onValueChange={v => setRole(v as UserRole)}>
               <SelectTrigger className="h-9 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-card border-border">
+                <SelectItem value="support"     className="text-xs">Suporte — apenas caixa de entrada</SelectItem>
                 <SelectItem value="member"      className="text-xs">Analista — acesso básico</SelectItem>
                 <SelectItem value="supervisor"  className="text-xs">Supervisor — vê seu time</SelectItem>
                 <SelectItem value="coordinator" className="text-xs">Coordenador — vê sua área</SelectItem>
@@ -280,8 +283,42 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
   const { toast } = useToast();
   const { instances, loading: loadingInst } = useEvolutionInstances();
   const [disabled, setDisabled] = useState<ModuleId[]>(getUserDisabledModules(user.id));
-  // stored as instance.name (the Evolution instance name)
   const [selectedInstance, setSelectedInstance] = useState(() => getInstanceForUserFromList(instances, user.id));
+
+  // Meta inbox accounts access
+  const [metaAccounts, setMetaAccounts] = useState<any[]>([]);
+  const [userAccountAccess, setUserAccountAccess] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const load = async () => {
+      const empresaId = await getSaasEmpresaId();
+      // Load all Meta accounts
+      const { data: accounts } = await (supabase as any)
+        .from('meta_inbox_accounts').select('id, nome, phone_display').eq('empresa_id', empresaId);
+      setMetaAccounts(accounts || []);
+
+      // Load user's access
+      const userUuid = user.id.replace(/^(user_|google_)/, '');
+      const { data: resolvedUser } = await (supabase as any).schema('saas').from('usuarios')
+        .select('id').eq('empresa_id', empresaId).eq('email', userUuid).maybeSingle();
+
+      if (resolvedUser) {
+        const { data: access } = await (supabase as any)
+          .from('meta_inbox_user_access').select('account_id').eq('usuario_id', resolvedUser.id);
+        setUserAccountAccess(new Set((access || []).map((a: any) => a.account_id)));
+      }
+    };
+    load();
+  }, [user.id]);
+
+  const toggleAccount = (accountId: string) => {
+    setUserAccountAccess(prev => {
+      const next = new Set(prev);
+      if (next.has(accountId)) next.delete(accountId);
+      else next.add(accountId);
+      return next;
+    });
+  };
 
   const toggle = (id: ModuleId) => {
     setDisabled(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
@@ -291,9 +328,26 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
 
   const assignedInst = instances.find(i => i.name === selectedInstance);
 
-  const save = () => {
+  const save = async () => {
     setUserModuleOverride(user.id, disabled);
     assignInstanceToUser(selectedInstance, user.id).catch(() => {});
+
+    // Save Meta inbox access
+    const empresaId = await getSaasEmpresaId();
+    const userEmail = user.id.replace(/^(user_|google_)/, '');
+    const { data: resolvedUser } = await (supabase as any).schema('saas').from('usuarios')
+      .select('id').eq('empresa_id', empresaId).eq('email', userEmail).maybeSingle();
+
+    if (resolvedUser) {
+      // Delete all existing access
+      await (supabase as any).from('meta_inbox_user_access').delete().eq('usuario_id', resolvedUser.id);
+      // Insert new access
+      if (userAccountAccess.size > 0) {
+        const rows = [...userAccountAccess].map(accountId => ({ usuario_id: resolvedUser.id, account_id: accountId }));
+        await (supabase as any).from('meta_inbox_user_access').insert(rows);
+      }
+    }
+
     toast({ title: 'Perfil salvo', description: `Configurações de ${user.name} atualizadas.` });
     onClose();
   };
@@ -712,11 +766,11 @@ function UsersAdminPage() {
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar usuários..." className="pl-9 h-8 text-xs bg-secondary border-border" />
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {['all', 'admin', 'director', 'supervisor', 'member'].map(r => (
+          {['all', 'admin', 'director', 'supervisor', 'member', 'support'].map(r => (
             <button key={r} onClick={() => setRoleFilter(r)}
               className={cn('text-xs px-3 py-1.5 rounded-lg border transition-all',
                 roleFilter === r ? 'bg-primary/15 border-primary/30 text-primary' : 'border-border text-muted-foreground hover:bg-muted')}>
-              {{ all: 'Todos', admin: 'Admin', director: 'Diretores', supervisor: 'Supervisores', member: 'Analistas' }[r]}
+              {{ all: 'Todos', admin: 'Admin', director: 'Diretores', supervisor: 'Supervisores', member: 'Analistas', support: 'Suporte' }[r]}
             </button>
           ))}
         </div>

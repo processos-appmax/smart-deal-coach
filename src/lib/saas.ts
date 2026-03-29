@@ -46,6 +46,7 @@ export function roleToDb(role: UserRole): string {
     coordinator: 'coordenador',
     supervisor: 'supervisor',
     member: 'vendedor',
+    support: 'suporte',
   };
   return map[role];
 }
@@ -59,6 +60,7 @@ export function roleFromDb(role: string | null | undefined): UserRole {
     coordenador: 'coordinator',
     supervisor: 'supervisor',
     vendedor: 'member',
+    suporte: 'support',
   };
   return map[(role || '').toLowerCase()] || 'member';
 }

@@ -7,11 +7,12 @@ export type UserRole =
   | 'manager'
   | 'coordinator'
   | 'supervisor'
-  | 'member';
+  | 'member'
+  | 'support';
 
 // Ordered from highest to lowest authority
 export const ROLE_HIERARCHY: UserRole[] = [
-  'admin', 'ceo', 'director', 'manager', 'coordinator', 'supervisor', 'member',
+  'admin', 'ceo', 'director', 'manager', 'coordinator', 'supervisor', 'member', 'support',
 ];
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -22,6 +23,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   coordinator: 'Coordenador',
   supervisor:  'Supervisor',
   member:      'Analista',
+  support:     'Suporte',
 };
 
 // Resources that can be toggled per role

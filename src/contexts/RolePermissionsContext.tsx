@@ -89,6 +89,14 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermission[] = [
     scope: 'self',
     resources: ['dashboard','meetings','whatsapp','inbox','performance','training'],
   },
+  {
+    role: 'support',
+    label: 'Suporte',
+    color: 'muted-foreground',
+    canDelete: true,
+    scope: 'self',
+    resources: ['inbox'],
+  },
 ];
 
 // ─── Context ──────────────────────────────────────────────────────────────────
