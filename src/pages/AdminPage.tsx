@@ -156,10 +156,11 @@ export default function AdminPage() {
   const [areaName, setAreaName] = useState('');
   const [areaGerente, setAreaGerente] = useState('');
   const [areaMemberEmails, setAreaMemberEmails] = useState<string[]>([]);
+  const [areaMemberSearch, setAreaMemberSearch] = useState('');
   const [areaMembersMap, setAreaMembersMap] = useState<Record<string, { nome: string; email: string; papel: string }[]>>({});
 
   const { tokens, setToken, models, setModuleModel, modules, setModuleEnabled, saveConfig,
-          getUserDisabledModules, setUserModuleOverride } = useAppConfig();
+          getUserDisabledModules, setUserModuleOverride, companySubtitle, setCompanySubtitle } = useAppConfig();
   const { user: currentUser } = useAuth();
   const { permissions, updatePermission } = useRolePermissions();
   const { getLogs, clearLogs } = useAuditLog();
@@ -391,6 +392,24 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Subtítulo da marca (aparece na sidebar e aba do navegador) */}
+              <div className="border-t border-border pt-4 space-y-3">
+                <h3 className="text-sm font-semibold">Marca / Branding</h3>
+                <div className="max-w-sm">
+                  <label className="text-xs font-medium block mb-1.5">Subtítulo (exibido na sidebar e aba do navegador)</label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={companySubtitle}
+                      onChange={e => setCompanySubtitle(e.target.value)}
+                      placeholder="Revenue OS"
+                      className="h-9 text-sm bg-secondary border-border"
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">Aparece como "APPMAX · {companySubtitle}" na sidebar e "Appmax {companySubtitle}" na aba.</p>
+                </div>
+              </div>
+
               <Button size="sm" className="bg-gradient-primary text-xs">
                 <Save className="w-3 h-3 mr-1" /> Salvar Alterações
               </Button>
@@ -593,8 +612,19 @@ export default function AdminPage() {
                       <label className="text-[10px] text-muted-foreground block mb-1">
                         Participantes da área — {areaMemberEmails.length} selecionado(s)
                       </label>
+                      <div className="relative mb-1.5">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Pesquisar usuários..."
+                          value={areaMemberSearch}
+                          onChange={e => setAreaMemberSearch(e.target.value)}
+                          className="h-7 text-xs bg-secondary border-border pl-8"
+                        />
+                      </div>
                       <div className="space-y-1 max-h-40 overflow-y-auto pr-1 border border-border/50 rounded-lg p-2 bg-secondary/50">
-                        {allowedAccounts.map(u => {
+                        {allowedAccounts.filter(u =>
+                          !areaMemberSearch || u.name.toLowerCase().includes(areaMemberSearch.toLowerCase()) || u.email.toLowerCase().includes(areaMemberSearch.toLowerCase())
+                        ).map(u => {
                           const selected = areaMemberEmails.includes(u.email);
                           return (
                             <div

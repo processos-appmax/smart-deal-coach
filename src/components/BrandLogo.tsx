@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 
 interface BrandLogoProps {
   compact?: boolean;
@@ -6,6 +7,8 @@ interface BrandLogoProps {
 }
 
 export default function BrandLogo({ compact = false, className }: BrandLogoProps) {
+  const { companySubtitle } = useAppConfig();
+
   return (
     <div className={cn('flex items-center gap-3', className)}>
       <img
@@ -19,10 +22,9 @@ export default function BrandLogo({ compact = false, className }: BrandLogoProps
       {!compact && (
         <div className="min-w-0">
           <p className="font-display text-base font-bold leading-none tracking-tight text-foreground">APPMAX</p>
-          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Revenue OS</p>
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{companySubtitle}</p>
         </div>
       )}
     </div>
   );
 }
-

@@ -4,7 +4,7 @@ import {
   RefreshCw, Loader2, Smartphone, QrCode, MessageSquare,
   Phone, Wifi, WifiOff, X, CheckCircle2, XCircle,
   AlertTriangle, Activity, ArrowDown, ArrowUp, CheckCheck,
-  ExternalLink, Database
+  ExternalLink, Database, Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -93,6 +93,7 @@ function EvolutionPanel() {
   const { user: currentUser, hasRole } = useAuth();
   const isAdmin = hasRole(['admin', 'director', 'supervisor']);
   const [realUsers, setRealUsers] = useState<Array<{ id: string; name: string; email: string; avatar: string; status: 'active' }>>([]);
+  const [userAssignSearch, setUserAssignSearch] = useState('');
 
   const [instances, setInstances] = useState<EvolutionInstance[]>([]);
   const [loading, setLoading] = useState(false);
@@ -332,13 +333,22 @@ function EvolutionPanel() {
                 {isAdmin && (
                   <div>
                     <label className="text-[10px] text-muted-foreground block mb-1">Atribuir a usuário</label>
+                    <div className="relative mb-1">
+                      <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        placeholder="Pesquisar..."
+                        value={userAssignSearch}
+                        onChange={e => setUserAssignSearch(e.target.value)}
+                        className="w-full h-6 text-[10px] bg-secondary border border-border rounded-lg pl-6 pr-2 text-foreground outline-none focus:border-primary/50"
+                      />
+                    </div>
                     <select
                       value={assignedUserId || ''}
                       onChange={e => handleAssignUser(inst.name, e.target.value)}
                       className="w-full h-7 text-[10px] bg-secondary border border-border rounded-lg px-2 text-foreground"
                     >
                       <option value="">— Sem atribuição —</option>
-                      {realUsers.filter(u => u.status === 'active').map(u => (
+                      {realUsers.filter(u => u.status === 'active' && (!userAssignSearch || u.name.toLowerCase().includes(userAssignSearch.toLowerCase()) || u.email.toLowerCase().includes(userAssignSearch.toLowerCase()))).map(u => (
                         <option key={u.id} value={u.id}>{u.name}</option>
                       ))}
                     </select>

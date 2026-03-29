@@ -74,6 +74,7 @@ interface AppConfigContextType {
   models: ModuleModels;
   modules: ModuleConfig[];
   userModuleOverrides: Record<string, ModuleId[]>;
+  companySubtitle: string;
   configLoaded: boolean;
   setToken: (module: keyof OpenAITokens, value: string) => void;
   setModuleModel: (module: ModuleAIKey, model: AIModelId) => void;
@@ -82,6 +83,7 @@ interface AppConfigContextType {
   setUserModuleOverride: (entityId: string, disabledModules: ModuleId[]) => void;
   getUserDisabledModules: (entityId: string) => ModuleId[];
   isModuleEnabledForUser: (moduleId: ModuleId, userId: string, teamId?: string) => boolean;
+  setCompanySubtitle: (value: string) => void;
   saveConfig: () => void;
 }
 
@@ -123,6 +125,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
   const [models, setModels] = useState<ModuleModels>(DEFAULT_MODELS);
   const [modules, setModules] = useState<ModuleConfig[]>(DEFAULT_MODULES);
   const [userModuleOverrides, setUserModuleOverrides] = useState<Record<string, ModuleId[]>>({});
+  const [companySubtitle, setCompanySubtitleState] = useState('Revenue OS');
   const [configLoaded, setConfigLoaded] = useState(false);
 
   useEffect(() => {
@@ -130,7 +133,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
       try {
         const empresaId = await getSaasEmpresaId();
 
-        const [tokensRes, modulesRes, usersRes, userModsRes] = await Promise.all([
+        const [tokensRes, modulesRes, usersRes, userModsRes, empresaRes] = await Promise.all([
           (supabase as any)
             .schema('saas')
             .from('tokens_ia_modulo')
@@ -152,6 +155,12 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
             .schema('saas')
             .from('configuracoes_modulos_usuario')
             .select('usuario_id,modulo_codigo,habilitado'),
+          (supabase as any)
+            .schema('saas')
+            .from('empresas')
+            .select('subtitulo')
+            .eq('id', empresaId)
+            .maybeSingle(),
         ]);
 
         if (!tokensRes.error && tokensRes.data) {
@@ -189,6 +198,11 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
             }
           }
           setUserModuleOverrides(next);
+        }
+
+        if (!empresaRes.error && empresaRes.data?.subtitulo) {
+          setCompanySubtitleState(empresaRes.data.subtitulo);
+          document.title = `Appmax ${empresaRes.data.subtitulo}`;
         }
       } catch {
         // keep defaults
@@ -306,16 +320,31 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
+  const setCompanySubtitle = (value: string) => {
+    setCompanySubtitleState(value);
+    document.title = `Appmax ${value}`;
+    void (async () => {
+      try {
+        const empresaId = await getSaasEmpresaId();
+        await (supabase as any)
+          .schema('saas')
+          .from('empresas')
+          .update({ subtitulo: value })
+          .eq('id', empresaId);
+      } catch {}
+    })();
+  };
+
   const saveConfig = () => {
     // Persistência já acontece nos setters.
   };
 
   return (
     <AppConfigContext.Provider value={{
-      tokens, models, modules, userModuleOverrides, configLoaded,
+      tokens, models, modules, userModuleOverrides, companySubtitle, configLoaded,
       setToken, setModuleModel, setModuleEnabled, isModuleEnabled,
       setUserModuleOverride, getUserDisabledModules, isModuleEnabledForUser,
-      saveConfig,
+      setCompanySubtitle, saveConfig,
     }}>
       {children}
     </AppConfigContext.Provider>

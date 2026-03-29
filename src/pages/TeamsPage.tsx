@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Plus, Users, Target, Trophy, ChevronRight, Pencil,
-  TrendingUp, Video, X, Check, UserPlus, Trash2, Loader2
+  TrendingUp, Video, X, Check, UserPlus, Trash2, Loader2, Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -36,6 +36,7 @@ function TeamModal({
   const [supervisorId, setSupervisorId] = useState(team?.supervisorId ?? '');
   const [areaId, setAreaId] = useState(team?.areaId ?? '');
   const [memberIds, setMemberIds] = useState<string[]>(team?.memberIds ?? []);
+  const [memberSearch, setMemberSearch] = useState('');
   const [goal, setGoal] = useState(String(team?.goal ?? 40));
 
   const supervisors = users.filter(u => ['admin', 'director', 'supervisor'].includes(u.role));
@@ -114,8 +115,19 @@ function TeamModal({
             <label className="text-xs font-medium block mb-2">
               Membros — {memberIds.length} selecionado(s)
             </label>
+            <div className="relative mb-2">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar membros..."
+                value={memberSearch}
+                onChange={e => setMemberSearch(e.target.value)}
+                className="h-8 text-xs bg-secondary border-border pl-8"
+              />
+            </div>
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-              {availableMembers.map(u => {
+              {availableMembers.filter(u =>
+                !memberSearch || u.name.toLowerCase().includes(memberSearch.toLowerCase()) || u.email.toLowerCase().includes(memberSearch.toLowerCase())
+              ).map(u => {
                 const userId = `user_${u.email}`;
                 const selected = memberIds.includes(userId);
                 return (
