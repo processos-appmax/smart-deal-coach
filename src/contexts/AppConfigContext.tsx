@@ -74,6 +74,7 @@ interface AppConfigContextType {
   models: ModuleModels;
   modules: ModuleConfig[];
   userModuleOverrides: Record<string, ModuleId[]>;
+  configLoaded: boolean;
   setToken: (module: keyof OpenAITokens, value: string) => void;
   setModuleModel: (module: ModuleAIKey, model: AIModelId) => void;
   setModuleEnabled: (id: ModuleId, enabled: boolean) => void;
@@ -122,6 +123,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
   const [models, setModels] = useState<ModuleModels>(DEFAULT_MODELS);
   const [modules, setModules] = useState<ModuleConfig[]>(DEFAULT_MODULES);
   const [userModuleOverrides, setUserModuleOverrides] = useState<Record<string, ModuleId[]>>({});
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   useEffect(() => {
     const loadFromDb = async () => {
@@ -190,6 +192,8 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
         }
       } catch {
         // keep defaults
+      } finally {
+        setConfigLoaded(true);
       }
     };
     loadFromDb();
@@ -308,7 +312,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppConfigContext.Provider value={{
-      tokens, models, modules, userModuleOverrides,
+      tokens, models, modules, userModuleOverrides, configLoaded,
       setToken, setModuleModel, setModuleEnabled, isModuleEnabled,
       setUserModuleOverride, getUserDisabledModules, isModuleEnabledForUser,
       saveConfig,

@@ -41,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { user, logout, canAccess } = useAuth();
-  const { isModuleEnabledForUser } = useAppConfig();
+  const { isModuleEnabledForUser, configLoaded } = useAppConfig();
   const { getPermission } = useRolePermissions();
   const location = useLocation();
   const navigate = useNavigate();
@@ -52,12 +52,13 @@ export default function AppSidebar({ collapsed, onToggle }: { collapsed: boolean
   // Normalize user ID: google_email → user_email (DB stores as user_)
   const normalizedUserId = (user?.id ?? '').replace(/^google_/, 'user_');
 
-  const visibleItems = NAV_ITEMS.filter(item => {
+  // Don't render nav items until config is loaded (prevents flash of unauthorized items)
+  const visibleItems = configLoaded ? NAV_ITEMS.filter(item => {
     const moduleId = item.path.replace('/', '') as any;
     const resourceOk = !item.resource || canAccess(item.resource);
     const moduleOk = isModuleEnabledForUser(moduleId, normalizedUserId, user?.teamId);
     return resourceOk && moduleOk;
-  });
+  }) : [];
 
   const roleLabel = user?.role ? (ROLE_LABELS[user.role] ?? user.role) : 'Usuário';
   const rolePerm = user?.role ? getPermission(user.role) : undefined;
