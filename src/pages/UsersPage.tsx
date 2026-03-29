@@ -328,28 +328,22 @@ function UserProfileModal({ user, onClose }: { user: User; onClose: () => void }
               {loadingInst && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
             </div>
 
-            <Select value={selectedInstance || '__none__'} onValueChange={v => setSelectedInstance(v === '__none__' ? '' : v)}>
-              <SelectTrigger className="h-9 text-xs bg-secondary border-border">
-                <SelectValue placeholder={loadingInst ? 'Carregando instâncias...' : 'Selecionar instância...'} />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-border max-h-60">
-                <SelectItem value="__none__" className="text-xs text-muted-foreground">— Sem instância —</SelectItem>
-                {instances.map(inst => {
-                  const isOpen = inst.connectionStatus === 'open';
-                  const phone = inst.ownerJid?.replace('@s.whatsapp.net', '');
-                  return (
-                    <SelectItem key={inst.id} value={inst.name} className="text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0',
-                          isOpen ? 'bg-success' : 'bg-muted-foreground')} />
-                        <span className="truncate max-w-[140px]">{inst.profileName || inst.name}</span>
-                        {phone && <span className="text-muted-foreground font-mono text-[10px]">{phone}</span>}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <select
+              value={selectedInstance || ''}
+              onChange={e => setSelectedInstance(e.target.value)}
+              className="w-full h-9 text-xs bg-secondary border border-border rounded-md px-3 text-foreground"
+            >
+              <option value="">— Sem instância —</option>
+              {instances.map(inst => {
+                const phone = inst.ownerJid?.replace('@s.whatsapp.net', '');
+                const status = inst.connectionStatus === 'open' ? '🟢' : '⚫';
+                return (
+                  <option key={inst.id} value={inst.name}>
+                    {status} {inst.profileName || inst.name} {phone ? `(${phone})` : ''}
+                  </option>
+                );
+              })}
+            </select>
 
             {assignedInst && (
               <div className={cn(
