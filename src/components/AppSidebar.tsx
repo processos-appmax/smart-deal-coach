@@ -49,10 +49,13 @@ export default function AppSidebar({ collapsed, onToggle }: { collapsed: boolean
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Normalize user ID: google_email → user_email (DB stores as user_)
+  const normalizedUserId = (user?.id ?? '').replace(/^google_/, 'user_');
+
   const visibleItems = NAV_ITEMS.filter(item => {
     const moduleId = item.path.replace('/', '') as any;
     const resourceOk = !item.resource || canAccess(item.resource);
-    const moduleOk = isModuleEnabledForUser(moduleId, user?.id ?? '', user?.teamId);
+    const moduleOk = isModuleEnabledForUser(moduleId, normalizedUserId, user?.teamId);
     return resourceOk && moduleOk;
   });
 

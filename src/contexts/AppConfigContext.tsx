@@ -252,10 +252,12 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
     modules.find(m => m.id === id)?.enabled ?? true;
 
   const setUserModuleOverride = (entityId: string, disabledModules: ModuleId[]) => {
-    setUserModuleOverrides(prev => ({ ...prev, [entityId]: disabledModules }));
-    // Persist only user_* overrides in DB.
-    if (!entityId.startsWith('user_')) return;
-    const email = entityId.replace(/^user_/, '').toLowerCase();
+    // Normalize: google_email → user_email (always store as user_)
+    const normalizedId = entityId.replace(/^google_/, 'user_');
+    setUserModuleOverrides(prev => ({ ...prev, [normalizedId]: disabledModules }));
+    // Persist in DB
+    if (!normalizedId.startsWith('user_')) return;
+    const email = normalizedId.replace(/^user_/, '').toLowerCase();
     void (async () => {
       try {
         const empresaId = await getSaasEmpresaId();
