@@ -273,7 +273,7 @@ export default function InboxSettingsModal({ onClose, onSaved, accounts = [], on
     }
     setLoadingTemplates(true);
     try {
-      const url = `https://graph.facebook.com/v19.0/${account.waba_id}/message_templates?access_token=${account.access_token}&fields=id,name,status,category,language,components,rejected_reason,quality_score&limit=100`;
+      const url = `https://graph.facebook.com/v21.0/${account.waba_id}/message_templates?access_token=${account.access_token}&fields=id,name,status,category,language,components,rejected_reason,quality_score&limit=100`;
       const res = await fetch(url);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -386,10 +386,10 @@ export default function InboxSettingsModal({ onClose, onSaved, accounts = [], on
       let method: string;
 
       if (editingTemplate) {
-        url = `https://graph.facebook.com/v19.0/${editingTemplate.id}`;
+        url = `https://graph.facebook.com/v21.0/${editingTemplate.id}`;
         method = 'POST';
       } else {
-        url = `https://graph.facebook.com/v19.0/${selectedAccount.waba_id}/message_templates`;
+        url = `https://graph.facebook.com/v21.0/${selectedAccount.waba_id}/message_templates`;
         method = 'POST';
       }
 
@@ -424,7 +424,10 @@ export default function InboxSettingsModal({ onClose, onSaved, accounts = [], on
     setDeletingTemplateId(templateId);
     try {
       const tmpl = templates.find(t => t.id === templateId);
-      const url = `https://graph.facebook.com/v19.0/${selectedAccount.waba_id}/message_templates?hsm_id=${templateId}&name=${tmpl?.name}`;
+      if (!tmpl?.name) throw new Error('Nome do template não encontrado.');
+
+      // Meta Graph API: DELETE by name (required). hsm_id is optional but can cause permission errors.
+      const url = `https://graph.facebook.com/v21.0/${selectedAccount.waba_id}/message_templates?name=${encodeURIComponent(tmpl.name)}`;
       const res = await fetch(url, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${selectedAccount.access_token}` },
@@ -473,7 +476,7 @@ export default function InboxSettingsModal({ onClose, onSaved, accounts = [], on
       });
 
       // Create in Meta with new name
-      const res = await fetch(`https://graph.facebook.com/v19.0/${selectedAccount.waba_id}/message_templates`, {
+      const res = await fetch(`https://graph.facebook.com/v21.0/${selectedAccount.waba_id}/message_templates`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${selectedAccount.access_token}`,
