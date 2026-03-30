@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Search, Plus, Filter, MoreHorizontal,
+  Search, Plus, Filter, MoreHorizontal, X,
   ChevronLeft, ChevronRight, Download, Factory, Settings2,
   ArrowUpDown, BarChart3, Copy, Table2, SlidersHorizontal, Loader2,
 } from 'lucide-react';
@@ -11,7 +12,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useCrmCompanies } from '@/hooks/useCrm';
+import { useCrmCompanies, useCreateCompany } from '@/hooks/useCrm';
+import { useToast } from '@/hooks/use-toast';
 
 const TABS = [
   { id: 'all', label: 'Todos as empresas' },
@@ -26,10 +28,35 @@ function formatCount(n: number) {
 }
 
 export default function CRMCompaniesPage() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(100);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newNome, setNewNome] = useState('');
+  const [newDominio, setNewDominio] = useState('');
+  const [newCnpj, setNewCnpj] = useState('');
+  const [newTelefone, setNewTelefone] = useState('');
+  const createCompany = useCreateCompany();
+
+  const handleCreateCompany = async () => {
+    if (!newNome.trim()) return;
+    try {
+      await createCompany.mutateAsync({
+        nome: newNome,
+        dominio: newDominio || null,
+        cnpj: newCnpj || null,
+        telefone: newTelefone || null,
+      } as any);
+      setShowCreateModal(false);
+      setNewNome(''); setNewDominio(''); setNewCnpj(''); setNewTelefone('');
+      toast({ title: 'Empresa criada com sucesso' });
+    } catch {
+      toast({ title: 'Erro ao criar empresa', variant: 'destructive' });
+    }
+  };
 
   const { data: result, isLoading } = useCrmCompanies({
     search: search || undefined,
@@ -94,7 +121,7 @@ export default function CRMCompaniesPage() {
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4" /></Button>
-          <Button size="sm" className="gap-1.5 h-8">Adicionar empresas <ChevronRight className="w-3 h-3" /></Button>
+          <Button size="sm" className="gap-1.5 h-8" onClick={() => setShowCreateModal(true)}>Adicionar empresas <ChevronRight className="w-3 h-3" /></Button>
         </div>
       </div>
 
@@ -167,8 +194,8 @@ export default function CRMCompaniesPage() {
             </thead>
             <tbody>
               {companies.map(company => (
-                <tr key={company.id} className="border-b border-border hover:bg-muted/20 transition-colors group">
-                  <td className="px-3 py-2.5"><input type="checkbox" className="rounded border-border" /></td>
+                <tr key={company.id} onClick={() => navigate(`/record/0-2/${company.numero_registro}`)} className="border-b border-border hover:bg-muted/20 transition-colors group cursor-pointer">
+                  <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}><input type="checkbox" className="rounded border-border" /></td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded bg-muted flex items-center justify-center flex-shrink-0">
@@ -234,6 +261,44 @@ export default function CRMCompaniesPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Create Company Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreateModal(false)} />
+          <div className="relative w-[440px] h-full bg-card border-l border-border shadow-xl overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h2 className="text-base font-semibold">Criar Empresa</h2>
+              <button onClick={() => setShowCreateModal(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="text-sm font-medium">Nome da empresa *</label>
+                <Input value={newNome} onChange={e => setNewNome(e.target.value)} placeholder="Nome da empresa" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Domínio</label>
+                <Input value={newDominio} onChange={e => setNewDominio(e.target.value)} placeholder="empresa.com.br" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">CNPJ</label>
+                <Input value={newCnpj} onChange={e => setNewCnpj(e.target.value)} placeholder="00.000.000/0000-00" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Telefone</label>
+                <Input value={newTelefone} onChange={e => setNewTelefone(e.target.value)} placeholder="+55 11 99999-0000" className="mt-1" />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-border flex gap-2">
+              <Button onClick={handleCreateCompany} disabled={!newNome.trim() || createCompany.isPending}>
+                {createCompany.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                Criar
+              </Button>
+              <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancelar</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { getSaasEmpresaId } from '@/lib/saas';
 import type {
   CrmContact, CrmCompany, CrmDeal, CrmTicket,
   CrmPipeline, CrmPipelineStage, CrmAssociation, CrmNote,
-  CrmListParams, CrmListResult, CrmObjectType,
+  CrmActivity, ActivityType, CrmListParams, CrmListResult, CrmObjectType,
 } from '@/types/crm';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -329,4 +329,109 @@ export async function createNote(input: { entidade_tipo: CrmObjectType; entidade
     .single();
   if (error) throw error;
   return data;
+}
+
+// ========================
+// ATIVIDADES (unificado)
+// ========================
+export async function listActivities(
+  objectType: CrmObjectType,
+  objectId: string,
+  filterType?: ActivityType,
+): Promise<CrmActivity[]> {
+  const empresaId = await getSaasEmpresaId();
+  const col = objectType === 'contact' ? 'contato_ids'
+    : objectType === 'company' ? 'empresa_crm_ids'
+    : objectType === 'deal' ? 'negocio_ids'
+    : 'ticket_ids';
+
+  let q = saas()
+    .from('crm_atividades')
+    .select('*')
+    .eq('empresa_id', empresaId)
+    .contains(col, [objectId])
+    .order('data_atividade', { ascending: false })
+    .limit(100);
+
+  if (filterType) q = q.eq('tipo', filterType);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createActivity(input: Partial<CrmActivity>): Promise<CrmActivity> {
+  const empresaId = await getSaasEmpresaId();
+  const { data, error } = await saas()
+    .from('crm_atividades')
+    .insert({ ...input, empresa_id: empresaId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateActivity(id: string, input: Partial<CrmActivity>): Promise<CrmActivity> {
+  const { data, error } = await saas()
+    .from('crm_atividades')
+    .update(input)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteActivity(id: string): Promise<void> {
+  const { error } = await saas().from('crm_atividades').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ========================
+// FETCH RECORD BY NUMERO (any type)
+// ========================
+export async function getRecordByNumero(objectType: CrmObjectType, numero: string) {
+  const table = objectType === 'contact' ? 'crm_contatos'
+    : objectType === 'company' ? 'crm_empresas'
+    : objectType === 'deal' ? 'crm_negocios'
+    : 'crm_tickets';
+  const { data, error } = await saas()
+    .from(table)
+    .select('*')
+    .eq('numero_registro', numero)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// ========================
+// ASSOCIATED RECORDS DETAIL
+// ========================
+export async function getAssociatedRecords(objectType: CrmObjectType, objectId: string) {
+  const associations = await listAssociations(objectType, objectId);
+  const grouped: Record<CrmObjectType, { id: string; assocId: string; tipo_associacao: string }[]> = {
+    contact: [], company: [], deal: [], ticket: [],
+  };
+
+  for (const a of associations) {
+    if (a.origem_tipo === objectType && a.origem_id === objectId) {
+      grouped[a.destino_tipo as CrmObjectType].push({ id: a.destino_id, assocId: a.id, tipo_associacao: a.tipo_associacao });
+    } else {
+      grouped[a.origem_tipo as CrmObjectType].push({ id: a.origem_id, assocId: a.id, tipo_associacao: a.tipo_associacao });
+    }
+  }
+
+  const fetchMany = async (table: string, ids: string[]) => {
+    if (ids.length === 0) return [];
+    const { data } = await saas().from(table).select('*').in('id', ids);
+    return data || [];
+  };
+
+  const [contacts, companies, deals, tickets] = await Promise.all([
+    fetchMany('crm_contatos', grouped.contact.map(r => r.id)),
+    fetchMany('crm_empresas', grouped.company.map(r => r.id)),
+    fetchMany('crm_negocios', grouped.deal.map(r => r.id)),
+    fetchMany('crm_tickets', grouped.ticket.map(r => r.id)),
+  ]);
+
+  return { contacts, companies, deals, tickets, associations: grouped };
 }

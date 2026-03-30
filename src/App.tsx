@@ -31,6 +31,7 @@ import CRMDealsPage from "@/pages/crm/CRMDealsPage";
 import CRMTicketsPage from "@/pages/crm/CRMTicketsPage";
 import CRMCompaniesPage from "@/pages/crm/CRMCompaniesPage";
 import CRMPipelineSettingsPage from "@/pages/crm/CRMPipelineSettingsPage";
+import CRMRecordPage from "@/pages/crm/CRMRecordPage";
 import NotFound from "@/pages/NotFound";
 
 import { CONFIG } from '@/lib/config';
@@ -82,6 +83,7 @@ function ProtectedRoutes() {
         <Route path="/crm/tickets"             element={<CRMTicketsPage />} />
         <Route path="/objects/0-4/views/*"     element={<CRMTicketsPage />} />
         <Route path="/crm/pipeline-settings"   element={<CRMPipelineSettingsPage />} />
+        <Route path="/record/:typeId/:numero"  element={<CRMRecordPage />} />
         <Route path="/me"           element={<MyProfilePage />} />
         <Route path="/"             element={<Navigate to={getDefaultRoute(user?.role)} replace />} />
         <Route path="*"             element={<NotFound />} />

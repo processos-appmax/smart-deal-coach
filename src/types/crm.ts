@@ -204,6 +204,58 @@ export interface CrmStageHistory {
 }
 
 // ========================
+// Atividades (unificado)
+// ========================
+export type ActivityType = 'nota' | 'email' | 'chamada' | 'tarefa' | 'reuniao' | 'whatsapp' | 'sms' | 'linkedin';
+export type TaskStatus = 'pendente' | 'em_andamento' | 'concluida' | 'cancelada';
+
+export interface CrmActivity {
+  id: string;
+  empresa_id: string;
+  tipo: ActivityType;
+  titulo: string | null;
+  conteudo: string | null;
+  // Email
+  email_para: string | null;
+  email_de: string | null;
+  email_cc: string | null;
+  email_assunto: string | null;
+  // Chamada
+  chamada_duracao: number | null;
+  chamada_resultado: string | null;
+  chamada_direcao: string | null;
+  // Tarefa
+  tarefa_status: TaskStatus | null;
+  tarefa_prioridade: string | null;
+  tarefa_tipo: string | null;
+  tarefa_fila: string | null;
+  tarefa_data_vencimento: string | null;
+  tarefa_lembrete: string | null;
+  tarefa_repetir: boolean;
+  // Reunião
+  reuniao_inicio: string | null;
+  reuniao_fim: string | null;
+  reuniao_tipo: string | null;
+  reuniao_localizacao: string | null;
+  reuniao_participantes: { nome: string; email: string }[];
+  reuniao_lembretes: { valor: number; unidade: string }[];
+  // Proprietário
+  criado_por: string | null;
+  criado_por_nome?: string;
+  atribuido_para: string | null;
+  atribuido_para_nome?: string;
+  // Associações
+  contato_ids: string[];
+  empresa_crm_ids: string[];
+  negocio_ids: string[];
+  ticket_ids: string[];
+  // Timestamps
+  data_atividade: string;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+// ========================
 // Filters & Pagination
 // ========================
 export interface CrmListParams {

@@ -3,7 +3,7 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as crm from '@/lib/crmService';
-import type { CrmListParams, CrmObjectType } from '@/types/crm';
+import type { CrmListParams, CrmObjectType, ActivityType } from '@/types/crm';
 
 // ========================
 // Contatos
@@ -263,5 +263,75 @@ export function useCreateNote() {
   return useMutation({
     mutationFn: crm.createNote,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['crm.notes'] }),
+  });
+}
+
+// ========================
+// Atividades
+// ========================
+export function useCrmActivities(objectType: CrmObjectType, objectId: string, filterType?: ActivityType) {
+  return useQuery({
+    queryKey: ['crm.activities', objectType, objectId, filterType],
+    queryFn: () => crm.listActivities(objectType, objectId, filterType),
+    enabled: !!objectId,
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateActivity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: crm.createActivity,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['crm.activities'] }),
+  });
+}
+
+export function useUpdateActivity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) => crm.updateActivity(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['crm.activities'] }),
+  });
+}
+
+export function useDeleteActivity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: crm.deleteActivity,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['crm.activities'] }),
+  });
+}
+
+// ========================
+// Record by numero (any type)
+// ========================
+export function useCrmRecord(objectType: CrmObjectType, numero: string) {
+  return useQuery({
+    queryKey: ['crm.record', objectType, numero],
+    queryFn: () => crm.getRecordByNumero(objectType, numero),
+    enabled: !!numero && !!objectType,
+  });
+}
+
+// ========================
+// Associated records detail
+// ========================
+export function useCrmAssociatedRecords(objectType: CrmObjectType, objectId: string) {
+  return useQuery({
+    queryKey: ['crm.associated', objectType, objectId],
+    queryFn: () => crm.getAssociatedRecords(objectType, objectId),
+    enabled: !!objectId,
+    staleTime: 30_000,
+  });
+}
+
+export function useDeleteAssociation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: crm.deleteAssociation,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['crm.associations'] });
+      qc.invalidateQueries({ queryKey: ['crm.associated'] });
+    },
   });
 }

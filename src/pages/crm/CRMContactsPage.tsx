@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Search, Plus, Filter, ExternalLink, MoreHorizontal,
+  Search, Plus, Filter, ExternalLink, MoreHorizontal, X,
   ChevronLeft, ChevronRight, Download, Contact, Settings2,
   ArrowUpDown, BarChart3, Copy, Table2, SlidersHorizontal, Loader2,
 } from 'lucide-react';
@@ -14,7 +15,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useCrmContacts } from '@/hooks/useCrm';
+import { useCrmContacts, useCreateContact } from '@/hooks/useCrm';
+import { useToast } from '@/hooks/use-toast';
 import type { ContactStatus } from '@/types/crm';
 
 const STATUS_CONFIG: Record<ContactStatus, { label: string; class: string }> = {
@@ -39,10 +41,19 @@ function formatCount(n: number) {
 }
 
 export default function CRMContactsPage() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newNome, setNewNome] = useState('');
+  const [newSobrenome, setNewSobrenome] = useState('');
+  const [newTelefone, setNewTelefone] = useState('');
+  const [newCargo, setNewCargo] = useState('');
+  const createContact = useCreateContact();
 
   const { data: result, isLoading } = useCrmContacts({
     search: search || undefined,
@@ -56,6 +67,26 @@ export default function CRMContactsPage() {
   const contacts = result?.data || [];
   const total = result?.total || 0;
   const totalPages = result?.totalPages || 1;
+
+  const handleCreateContact = async () => {
+    if (!newEmail.trim() || !newNome.trim()) return;
+    try {
+      await createContact.mutateAsync({
+        nome: `${newNome} ${newSobrenome}`.trim(),
+        email: newEmail,
+        telefone: newTelefone || null,
+        cargo: newCargo || null,
+        status: 'lead',
+        fonte: 'outros',
+      } as any);
+      setShowCreateModal(false);
+      setNewEmail(''); setNewNome(''); setNewSobrenome(''); setNewTelefone(''); setNewCargo('');
+      toast({ title: 'Contato criado com sucesso' });
+    } catch (err: any) {
+      const msg = err?.message?.includes('idx_crm_contatos_email_unique') ? 'Já existe um contato com este e-mail' : 'Erro ao criar contato';
+      toast({ title: msg, variant: 'destructive' });
+    }
+  };
 
   const paginationNumbers = useMemo(() => {
     const pages: number[] = [];
@@ -111,7 +142,7 @@ export default function CRMContactsPage() {
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <MoreHorizontal className="w-4 h-4" />
           </Button>
-          <Button size="sm" className="gap-1.5 h-8">
+          <Button size="sm" className="gap-1.5 h-8" onClick={() => setShowCreateModal(true)}>
             Adicionar contatos <ChevronRight className="w-3 h-3" />
           </Button>
         </div>
@@ -211,8 +242,8 @@ export default function CRMContactsPage() {
               {contacts.map(contact => {
                 const st = STATUS_CONFIG[contact.status];
                 return (
-                  <tr key={contact.id} className="border-b border-border hover:bg-muted/20 transition-colors group">
-                    <td className="px-3 py-2.5">
+                  <tr key={contact.id} onClick={() => navigate(`/record/0-1/${contact.numero_registro}`)} className="border-b border-border hover:bg-muted/20 transition-colors group cursor-pointer">
+                    <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                       <input type="checkbox" className="rounded border-border" />
                     </td>
                     <td className="px-3 py-2.5">
@@ -310,6 +341,48 @@ export default function CRMContactsPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Create Contact Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreateModal(false)} />
+          <div className="relative w-[440px] h-full bg-card border-l border-border shadow-xl overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h2 className="text-base font-semibold">Criar Contato</h2>
+              <button onClick={() => setShowCreateModal(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="text-sm font-medium">E-mail *</label>
+                <Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="email@exemplo.com" className="mt-1" type="email" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Nome *</label>
+                <Input value={newNome} onChange={e => setNewNome(e.target.value)} placeholder="Nome" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Sobrenome</label>
+                <Input value={newSobrenome} onChange={e => setNewSobrenome(e.target.value)} placeholder="Sobrenome" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Cargo</label>
+                <Input value={newCargo} onChange={e => setNewCargo(e.target.value)} placeholder="Cargo" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Número de telefone</label>
+                <Input value={newTelefone} onChange={e => setNewTelefone(e.target.value)} placeholder="+55 11 99999-0000" className="mt-1" />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-border flex gap-2">
+              <Button onClick={handleCreateContact} disabled={!newEmail.trim() || !newNome.trim() || createContact.isPending}>
+                {createContact.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                Criar
+              </Button>
+              <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancelar</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
