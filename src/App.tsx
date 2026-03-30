@@ -71,6 +71,10 @@ function ProtectedRoutes() {
         <Route path="/ai-config"    element={<AIConfigPage />} />
         <Route path="/admin"        element={<AdminPage />} />
         <Route path="/performance"  element={<PerformancePage />} />
+        <Route path="/crm/contacts"  element={<CRMContactsPage />} />
+        <Route path="/crm/deals"     element={<CRMDealsPage />} />
+        <Route path="/crm/tickets"   element={<CRMTicketsPage />} />
+        <Route path="/crm/companies" element={<CRMCompaniesPage />} />
         <Route path="/me"           element={<MyProfilePage />} />
         <Route path="/"             element={<Navigate to={getDefaultRoute(user?.role)} replace />} />
         <Route path="*"             element={<NotFound />} />
