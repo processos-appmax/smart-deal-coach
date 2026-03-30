@@ -161,6 +161,7 @@ export default function AdminPage() {
   const [areaGerente, setAreaGerente] = useState('');
   const [areaMemberEmails, setAreaMemberEmails] = useState<string[]>([]);
   const [areaMemberSearch, setAreaMemberSearch] = useState('');
+  const [adminUserSearch, setAdminUserSearch] = useState('');
   const [areaMembersMap, setAreaMembersMap] = useState<Record<string, { nome: string; email: string; papel: string }[]>>({});
 
   const { tokens, setToken, models, setModuleModel, modules, setModuleEnabled, saveConfig,
@@ -794,14 +795,27 @@ export default function AdminPage() {
               </div>
 
               <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center justify-between mb-4">
                   <h2 className="font-display font-semibold text-lg">Contas autorizadas no SSO</h2>
                   <span className="text-xs px-2 py-1 rounded-full border bg-primary/10 text-primary border-primary/20">
                     {allowedAccounts.length} conta(s)
                   </span>
                 </div>
+                <div className="relative mb-4">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={adminUserSearch}
+                    onChange={e => setAdminUserSearch(e.target.value)}
+                    placeholder="Pesquisar por nome ou e-mail..."
+                    className="h-9 text-xs pl-9 bg-secondary border-border"
+                  />
+                </div>
                 <div className="space-y-2">
-                  {allowedAccounts.map(acc => {
+                  {allowedAccounts.filter(acc =>
+                    !adminUserSearch ||
+                    acc.name.toLowerCase().includes(adminUserSearch.toLowerCase()) ||
+                    acc.email.toLowerCase().includes(adminUserSearch.toLowerCase())
+                  ).map(acc => {
                     const color = roleColorMap[permissions.find(p => p.role === acc.role)?.color ?? 'muted-foreground'];
                     return (
                       <div key={acc.email} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/30 transition-colors">
