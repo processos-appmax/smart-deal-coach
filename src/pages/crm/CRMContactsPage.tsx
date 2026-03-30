@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Search, Plus, Filter, ExternalLink, MoreHorizontal,
   ChevronLeft, ChevronRight, Download, Contact, Settings2,
-  ArrowUpDown, BarChart3, Copy, Table2, SlidersHorizontal,
+  ArrowUpDown, BarChart3, Copy, Table2, SlidersHorizontal, Loader2,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -14,20 +14,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useCrmContacts } from '@/hooks/useCrm';
+import type { ContactStatus } from '@/types/crm';
 
-interface ContactItem {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  company: string;
-  source: string;
-  status: 'lead' | 'qualified' | 'customer' | 'churned';
-  createdAt: string;
-  lastActivity: string;
-}
-
-const STATUS_CONFIG: Record<ContactItem['status'], { label: string; class: string }> = {
+const STATUS_CONFIG: Record<ContactStatus, { label: string; class: string }> = {
   lead:      { label: 'Lead',        class: 'bg-muted text-muted-foreground' },
   qualified: { label: 'Qualificado', class: 'bg-warning/15 text-warning' },
   customer:  { label: 'Cliente',     class: 'bg-success/15 text-success' },
@@ -35,24 +25,12 @@ const STATUS_CONFIG: Record<ContactItem['status'], { label: string; class: strin
 };
 
 const TABS = [
-  { id: 'all', label: 'Todos os contatos', count: 692600 },
+  { id: 'all', label: 'Todos os contatos' },
   { id: 'lead', label: '1. Lead' },
-  { id: 'produtor', label: '2. Produtor' },
-  { id: 'integrado', label: '3. Integrado' },
-  { id: 'temp', label: 'Temporário Schuldz' },
+  { id: 'qualified', label: '2. Qualificado' },
+  { id: 'customer', label: '3. Cliente' },
+  { id: 'churned', label: '4. Churned' },
 ];
-
-const MOCK_CONTACTS: ContactItem[] = Array.from({ length: 80 }, (_, i) => ({
-  id: `c-${i}`,
-  name: ['Igor Sepúlveda', 'Jussara Kelly Matosin...', 'Thiago Nascimento G...', 'Fabricoi Pascoal De O...', 'Comercial Gladis Perf...', 'CANAL DOA JOGOS H...', 'Ronaltin S Lopes', 'Leon Victor Silva Oliv...', 'Erica Custodia Parreir...', 'Julio Minatto', 'Maria das graças Silv...', 'S1B2S3 Barcelos', 'Maiara Costa De Oliv...', 'Ryan Barboza Dantas', 'Marisa Elina Santos d...', 'Gilton Felix Santos'][i % 16],
-  email: [`trafego@hospedare.io`, `jussarasemijoias0@gmail.c...`, `thiagonasc26@icloud.com...`, `oficial.ebookpro@gmail.co...`, `contato@gladisperfumaria...`, `marinhobruno04@gmail.c...`, `rootsemroot@gmail.com`, `vleon4558@gmail.com`, `pedroparreirasyt@gmail.c...`, `juliominatto123@gmail.co...`, `mdgra0305@gmail.com`, `sbsbarcelos4@gmail.com`, `maya_2008@outlook.com...`, `ryanbarboza5@gmail.com...`, `fenixgestao97@gmail.com...`, `eduardogoessilva@mozej.c...`][i % 16],
-  phone: [`+55-73-99909-9972`, `+55-31-97182-5582`, `+55-35-99226-5156`, `+55-13-99620-4549`, `+55-45-99156-2306`, `--`, `+55-73-99934-6714`, `+55-73-98119-0077`, `+55-31-98499-1492`, `+55-47-99103-3535`, `+55-11-97733-2784`, `--`, `+55-71-99686-5418`, `+55-11-95887-2879`, `+55-21-96568-5509`, `+55-79-98806-1455`][i % 16],
-  company: ['Hospedare', 'SemiJoias', 'TechCo', 'EbookPro', 'Gladis Perfumaria', 'Canal DOA', 'RootSem', 'VLeon', 'Parreira', 'Minatto', 'Silva Inc', 'Barcelos', 'Costa Ltd', 'Barboza', 'Fenix', 'Felix'][i % 16],
-  source: ['Outras Campanhas', 'Referências', 'Outras Campanhas', 'Referências', 'Fontes off-line', 'Fontes off-line', 'AI Referrals', 'Outras Campanhas', 'Tráfego direto', 'Outras Campanhas', 'Outras Campanhas', 'Fontes off-line', 'Outras Campanhas', 'Pesquisa Orgânica', 'Fontes off-line', 'Outras Campanhas'][i % 16],
-  status: (['lead', 'qualified', 'customer', 'churned'] as const)[i % 4],
-  createdAt: new Date(Date.now() - i * 3600000).toISOString(),
-  lastActivity: new Date(Date.now() - i * 1800000).toISOString(),
-}));
 
 function formatCount(n: number) {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)} mi`;
@@ -66,15 +44,18 @@ export default function CRMContactsPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
-  const filtered = useMemo(() =>
-    MOCK_CONTACTS.filter(c =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
-    ), [search]);
+  const { data: result, isLoading } = useCrmContacts({
+    search: search || undefined,
+    status: activeTab !== 'all' ? activeTab : undefined,
+    page,
+    perPage,
+    orderBy: 'criado_em',
+    orderDir: 'desc',
+  });
 
-  const totalPages = Math.ceil(filtered.length / perPage);
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  const contacts = result?.data || [];
+  const total = result?.total || 0;
+  const totalPages = result?.totalPages || 1;
 
   const paginationNumbers = useMemo(() => {
     const pages: number[] = [];
@@ -105,7 +86,7 @@ export default function CRMContactsPage() {
           {TABS.map((tab, idx) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); setPage(1); }}
               className={cn(
                 'px-3 py-2.5 text-sm transition-colors border-b-2 -mb-px',
                 activeTab === tab.id
@@ -114,9 +95,9 @@ export default function CRMContactsPage() {
               )}
             >
               {tab.label}
-              {tab.count && (
+              {idx === 0 && total > 0 && (
                 <Badge variant="outline" className="ml-1.5 text-[10px] h-5 px-1.5 rounded-sm font-semibold">
-                  {formatCount(tab.count)}
+                  {formatCount(total)}
                 </Badge>
               )}
               {idx === 0 && <span className="ml-1 text-muted-foreground/50 cursor-pointer">×</span>}
@@ -199,68 +180,86 @@ export default function CRMContactsPage() {
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-muted/50">
-              <th className="w-10 px-3 py-2.5">
-                <input type="checkbox" className="rounded border-border" />
-              </th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Nome</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">ID do registro</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">
-                <button className="flex items-center gap-1">Data de criação (GMT-3) <ArrowUpDown className="w-3 h-3" /></button>
-              </th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">E-mail</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Número de telefone</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Conversão inicial n1</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Conversão inicial n2</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map(contact => (
-              <tr key={contact.id} className="border-b border-border hover:bg-muted/20 transition-colors group">
-                <td className="px-3 py-2.5">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-40">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : contacts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+            <Contact className="w-10 h-10 mb-2 opacity-30" />
+            <p className="text-sm">Nenhum contato encontrado</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-border bg-muted/50">
+                <th className="w-10 px-3 py-2.5">
                   <input type="checkbox" className="rounded border-border" />
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                      {contact.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                    </div>
-                    <span className="font-medium text-primary hover:underline cursor-pointer text-sm truncate max-w-[200px]">
-                      {contact.name}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 text-muted-foreground text-xs font-mono">
-                  {Math.floor(21230000000 + Math.random() * 1000000000)}
-                </td>
-                <td className="px-3 py-2.5 text-muted-foreground text-xs">
-                  Hoje às {new Date(contact.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} GMT-3
-                </td>
-                <td className="px-3 py-2.5">
-                  <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary text-xs flex items-center gap-1 truncate max-w-[200px]">
-                    {contact.email} <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 opacity-0 group-hover:opacity-100" />
-                  </a>
-                </td>
-                <td className="px-3 py-2.5">
-                  {contact.phone !== '--' ? (
-                    <span className="text-primary text-xs font-medium">{contact.phone}</span>
-                  ) : (
-                    <span className="text-muted-foreground/40 text-xs">--</span>
-                  )}
-                </td>
-                <td className="px-3 py-2.5 text-muted-foreground text-xs">{contact.source}</td>
-                <td className="px-3 py-2.5 text-muted-foreground text-xs">
-                  {['appmax-site', 'login.appmax.com.br', 'chatgpt.com', 'appmax_app', 'Ouvidoria-Max'][parseInt(contact.id.split('-')[1]) % 5]}
-                </td>
+                </th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Nome</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">ID do registro</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">
+                  <button className="flex items-center gap-1">Data de criação (GMT-3) <ArrowUpDown className="w-3 h-3" /></button>
+                </th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">E-mail</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Número de telefone</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Fonte</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {contacts.map(contact => {
+                const st = STATUS_CONFIG[contact.status];
+                return (
+                  <tr key={contact.id} className="border-b border-border hover:bg-muted/20 transition-colors group">
+                    <td className="px-3 py-2.5">
+                      <input type="checkbox" className="rounded border-border" />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                          {contact.nome.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <span className="font-medium text-primary hover:underline cursor-pointer text-sm truncate max-w-[200px]">
+                          {contact.nome}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground text-xs font-mono">
+                      {contact.numero_registro}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground text-xs">
+                      {new Date(contact.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {contact.email ? (
+                        <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary text-xs flex items-center gap-1 truncate max-w-[200px]">
+                          {contact.email} <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 opacity-0 group-hover:opacity-100" />
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-xs">--</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {contact.telefone ? (
+                        <span className="text-primary text-xs font-medium">{contact.telefone}</span>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-xs">--</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground text-xs">{contact.fonte || '--'}</td>
+                    <td className="px-3 py-2.5">
+                      <Badge className={cn('text-[10px] px-1.5 rounded-sm', st.class)}>{st.label}</Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Pagination - HubSpot style */}
+      {/* Pagination */}
       <div className="flex items-center justify-center gap-2 px-4 py-3 border-t border-border bg-card flex-shrink-0">
         <button
           disabled={page <= 1}
@@ -296,6 +295,8 @@ export default function CRMContactsPage() {
         >
           Próximo <ChevronRight className="w-4 h-4" />
         </button>
+        <div className="w-px h-5 bg-border mx-2" />
+        <span className="text-xs text-muted-foreground">{total} registros</span>
         <div className="w-px h-5 bg-border mx-2" />
         <Select value={String(perPage)} onValueChange={v => { setPerPage(Number(v)); setPage(1); }}>
           <SelectTrigger className="h-8 w-auto gap-1 text-sm border-0 shadow-none">

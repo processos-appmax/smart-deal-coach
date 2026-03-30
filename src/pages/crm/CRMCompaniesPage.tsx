@@ -3,45 +3,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Search, Plus, Filter, ExternalLink, MoreHorizontal,
+  Search, Plus, Filter, MoreHorizontal,
   ChevronLeft, ChevronRight, Download, Factory, Settings2,
-  ArrowUpDown, BarChart3, Copy, Table2, SlidersHorizontal,
+  ArrowUpDown, BarChart3, Copy, Table2, SlidersHorizontal, Loader2,
 } from 'lucide-react';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-
-interface Company {
-  id: string;
-  name: string;
-  owner: string;
-  phone: string;
-  city: string;
-  country: string;
-  createdAt: string;
-  lastActivity: string;
-}
+import { useCrmCompanies } from '@/hooks/useCrm';
 
 const TABS = [
-  { id: 'all', label: 'Todos as empresas', count: 300300 },
+  { id: 'all', label: 'Todos as empresas' },
   { id: 'mine', label: 'Minhas empresas' },
   { id: 'validation', label: 'Validação manual PaaS' },
 ];
-
-const MOCK_COMPANIES: Company[] = Array.from({ length: 60 }, (_, i) => ({
-  id: `co-${i}`,
-  name: ['HubSpot, Inc.', 'ayirastore.com.br', 'Integracao', 'Ohio Facebook suppo...', 'naoresponder.com', 'ejtech.com.br', 'F5LCON COMERCIO E...', 'bigacessorios.com', 'vokerstore.com.br', 'Suamusica.Com', 'Naotenhosite', 'provisaovip.com.br', 'esportemente.com.br', 'SANFLOR STORE', 'geniostore.com', 'ELETRO SHOPBR'][i % 16],
-  owner: 'Nenhum proprietário',
-  phone: i % 3 === 0 ? `+55 ${Math.floor(Math.random() * 90 + 10)} ${Math.floor(Math.random() * 90000 + 10000)}-${Math.floor(Math.random() * 9000 + 1000)}` : '--',
-  city: ['Cambridge', 'São Paulo', 'Rio de Janeiro', '--', 'Curitiba', '--', '--', '--'][i % 8],
-  country: ['United States', 'Brazil', 'Brazil', '--', 'Brazil', 'Brazil', '--', 'Brazil'][i % 8],
-  createdAt: new Date(Date.now() - i * 86400000 * 30).toISOString(),
-  lastActivity: new Date(Date.now() - i * 86400000 * 5).toISOString(),
-}));
 
 function formatCount(n: number) {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)} mi`;
@@ -55,11 +31,17 @@ export default function CRMCompaniesPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(100);
 
-  const filtered = useMemo(() =>
-    MOCK_COMPANIES.filter(c => c.name.toLowerCase().includes(search.toLowerCase())), [search]);
+  const { data: result, isLoading } = useCrmCompanies({
+    search: search || undefined,
+    page,
+    perPage,
+    orderBy: 'criado_em',
+    orderDir: 'desc',
+  });
 
-  const totalPages = Math.ceil(filtered.length / perPage);
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  const companies = result?.data || [];
+  const total = result?.total || 0;
+  const totalPages = result?.totalPages || 1;
 
   const paginationNumbers = useMemo(() => {
     const pages: number[] = [];
@@ -89,7 +71,7 @@ export default function CRMCompaniesPage() {
           {TABS.map((tab, idx) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); setPage(1); }}
               className={cn(
                 'px-3 py-2.5 text-sm transition-colors border-b-2 -mb-px',
                 activeTab === tab.id
@@ -98,9 +80,9 @@ export default function CRMCompaniesPage() {
               )}
             >
               {tab.label}
-              {tab.count && (
+              {idx === 0 && total > 0 && (
                 <Badge variant="outline" className="ml-1.5 text-[10px] h-5 px-1.5 rounded-sm font-semibold">
-                  {formatCount(tab.count)}
+                  {formatCount(total)}
                 </Badge>
               )}
               {idx === 0 && <span className="ml-1 text-muted-foreground/50 cursor-pointer">×</span>}
@@ -147,7 +129,7 @@ export default function CRMCompaniesPage() {
           Data da última atividade <ChevronRight className="w-3 h-3 rotate-90" />
         </button>
         <button className="flex items-center gap-1 text-muted-foreground hover:text-foreground font-medium">
-          Status do lead <ChevronRight className="w-3 h-3 rotate-90" />
+          Setor <ChevronRight className="w-3 h-3 rotate-90" />
         </button>
         <button className="text-muted-foreground hover:text-foreground font-medium">+ Mais</button>
         <div className="w-px h-4 bg-border" />
@@ -158,56 +140,65 @@ export default function CRMCompaniesPage() {
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-muted/50">
-              <th className="w-10 px-3 py-2.5"><input type="checkbox" className="rounded border-border" /></th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Nome da empresa</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Proprietário da empresa</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">
-                <button className="flex items-center gap-1">Data de criação (GMT-3) <ArrowUpDown className="w-3 h-3" /></button>
-              </th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Número de telefone</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Data da última atividade (GMT-3)</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Cidade</th>
-              <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">País/Região</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map(company => (
-              <tr key={company.id} className="border-b border-border hover:bg-muted/20 transition-colors group">
-                <td className="px-3 py-2.5"><input type="checkbox" className="rounded border-border" /></td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                      <Factory className="w-3.5 h-3.5 text-muted-foreground" />
-                    </div>
-                    <span className="font-medium text-primary hover:underline cursor-pointer text-sm">{company.name}</span>
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 text-muted-foreground text-xs">{company.owner}</td>
-                <td className="px-3 py-2.5 text-muted-foreground text-xs">
-                  {new Date(company.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </td>
-                <td className="px-3 py-2.5">
-                  {company.phone !== '--' ? (
-                    <span className="text-primary text-xs font-medium">{company.phone}</span>
-                  ) : (
-                    <span className="text-muted-foreground/40 text-xs">--</span>
-                  )}
-                </td>
-                <td className="px-3 py-2.5 text-muted-foreground text-xs">
-                  {new Date(company.lastActivity).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </td>
-                <td className="px-3 py-2.5 text-muted-foreground text-xs">{company.city}</td>
-                <td className="px-3 py-2.5 text-muted-foreground text-xs">{company.country}</td>
+        {isLoading ? (
+          <div className="flex items-center justify-center h-40">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : companies.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+            <Factory className="w-10 h-10 mb-2 opacity-30" />
+            <p className="text-sm">Nenhuma empresa encontrada</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-border bg-muted/50">
+                <th className="w-10 px-3 py-2.5"><input type="checkbox" className="rounded border-border" /></th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Nome da empresa</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">ID do registro</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">
+                  <button className="flex items-center gap-1">Data de criação (GMT-3) <ArrowUpDown className="w-3 h-3" /></button>
+                </th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Número de telefone</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Plataforma</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">Cidade</th>
+                <th className="text-left px-3 py-2.5 font-medium text-muted-foreground text-xs">País/Região</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {companies.map(company => (
+                <tr key={company.id} className="border-b border-border hover:bg-muted/20 transition-colors group">
+                  <td className="px-3 py-2.5"><input type="checkbox" className="rounded border-border" /></td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                        <Factory className="w-3.5 h-3.5 text-muted-foreground" />
+                      </div>
+                      <span className="font-medium text-primary hover:underline cursor-pointer text-sm">{company.nome}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-muted-foreground text-xs font-mono">{company.numero_registro}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground text-xs">
+                    {new Date(company.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {company.telefone ? (
+                      <span className="text-primary text-xs font-medium">{company.telefone}</span>
+                    ) : (
+                      <span className="text-muted-foreground/40 text-xs">--</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-muted-foreground text-xs">{company.plataforma || '--'}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground text-xs">{company.cidade || '--'}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground text-xs">{company.pais || '--'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Pagination - HubSpot style */}
+      {/* Pagination */}
       <div className="flex items-center justify-center gap-2 px-4 py-3 border-t border-border bg-card flex-shrink-0">
         <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
           className={cn('flex items-center gap-1 text-sm', page <= 1 ? 'text-muted-foreground/30 cursor-not-allowed' : 'text-muted-foreground hover:text-foreground')}>
@@ -228,6 +219,8 @@ export default function CRMCompaniesPage() {
           className={cn('flex items-center gap-1 text-sm', page >= totalPages ? 'text-muted-foreground/30 cursor-not-allowed' : 'text-muted-foreground hover:text-foreground')}>
           Próximo <ChevronRight className="w-4 h-4" />
         </button>
+        <div className="w-px h-5 bg-border mx-2" />
+        <span className="text-xs text-muted-foreground">{total} registros</span>
         <div className="w-px h-5 bg-border mx-2" />
         <Select value={String(perPage)} onValueChange={v => { setPerPage(Number(v)); setPage(1); }}>
           <SelectTrigger className="h-8 w-auto gap-1 text-sm border-0 shadow-none">

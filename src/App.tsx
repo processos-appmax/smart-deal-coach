@@ -71,10 +71,15 @@ function ProtectedRoutes() {
         <Route path="/ai-config"    element={<AIConfigPage />} />
         <Route path="/admin"        element={<AdminPage />} />
         <Route path="/performance"  element={<PerformancePage />} />
-        <Route path="/crm/contacts"  element={<CRMContactsPage />} />
-        <Route path="/crm/deals"     element={<CRMDealsPage />} />
-        <Route path="/crm/tickets"   element={<CRMTicketsPage />} />
-        <Route path="/crm/companies" element={<CRMCompaniesPage />} />
+        {/* CRM routes — padrão HubSpot: /objects/0-X/views e /record/0-X/:id */}
+        <Route path="/crm/contacts"           element={<CRMContactsPage />} />
+        <Route path="/objects/0-1/views/*"     element={<CRMContactsPage />} />
+        <Route path="/crm/companies"           element={<CRMCompaniesPage />} />
+        <Route path="/objects/0-2/views/*"     element={<CRMCompaniesPage />} />
+        <Route path="/crm/deals"               element={<CRMDealsPage />} />
+        <Route path="/objects/0-3/views/*"     element={<CRMDealsPage />} />
+        <Route path="/crm/tickets"             element={<CRMTicketsPage />} />
+        <Route path="/objects/0-4/views/*"     element={<CRMTicketsPage />} />
         <Route path="/me"           element={<MyProfilePage />} />
         <Route path="/"             element={<Navigate to={getDefaultRoute(user?.role)} replace />} />
         <Route path="*"             element={<NotFound />} />
