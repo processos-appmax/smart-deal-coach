@@ -75,9 +75,10 @@ function formatTime(ts: string | number) {
   const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts);
   if (isNaN(d.getTime())) return '';
   const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return time;
+  const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  return `${date} ${time}`;
 }
 
 /* ── Status icon for sent messages ─────────────────────── */
