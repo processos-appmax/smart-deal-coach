@@ -299,6 +299,18 @@ export default function CRMDealsPage() {
           })}
         </div>
       </div>
+      {/* AI Config Modal */}
+      {aiConfigStage && (
+        <StageAIConfigModal
+          open={!!aiConfigStage}
+          onClose={() => setAiConfigStage(null)}
+          stageName={aiConfigStage.name}
+          stageId={aiConfigStage.id}
+          allStages={pipeline.stages.map(s => ({ id: s.id, name: s.name }))}
+          initialConfig={stageAIConfigs[aiConfigStage.id]}
+          onSave={(id, cfg) => setStageAIConfigs(prev => ({ ...prev, [id]: cfg }))}
+        />
+      )}
     </div>
   );
 }
