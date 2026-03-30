@@ -847,7 +847,7 @@ export default function InboxSettingsModal({ onClose, onSaved, accounts = [], on
                             <QualityBadge quality={t.quality_score} />
                             <span className="text-[10px] text-muted-foreground">{t.language}</span>
                           </div>
-                          {t.rejected_reason && (
+                          {t.rejected_reason && t.rejected_reason !== 'NONE' && (
                             <p className="text-[10px] text-red-500 mt-0.5 flex items-center gap-1">
                               <AlertCircle className="w-3 h-3" /> {t.rejected_reason}
                             </p>
