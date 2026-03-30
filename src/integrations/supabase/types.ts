@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      meta_bulk_send_logs: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          delivered_count: number | null
+          empresa_id: string
+          failed_count: number | null
+          fallback_body: string | null
+          fallback_sent_count: number | null
+          fallback_template: string | null
+          finished_at: string | null
+          id: string
+          read_count: number | null
+          rows_detail: Json | null
+          sent_count: number | null
+          started_at: string | null
+          template_body: string | null
+          template_language: string | null
+          template_name: string
+          total_rows: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          delivered_count?: number | null
+          empresa_id: string
+          failed_count?: number | null
+          fallback_body?: string | null
+          fallback_sent_count?: number | null
+          fallback_template?: string | null
+          finished_at?: string | null
+          id?: string
+          read_count?: number | null
+          rows_detail?: Json | null
+          sent_count?: number | null
+          started_at?: string | null
+          template_body?: string | null
+          template_language?: string | null
+          template_name: string
+          total_rows?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          delivered_count?: number | null
+          empresa_id?: string
+          failed_count?: number | null
+          fallback_body?: string | null
+          fallback_sent_count?: number | null
+          fallback_template?: string | null
+          finished_at?: string | null
+          id?: string
+          read_count?: number | null
+          rows_detail?: Json | null
+          sent_count?: number | null
+          started_at?: string | null
+          template_body?: string | null
+          template_language?: string | null
+          template_name?: string
+          total_rows?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_bulk_send_logs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "meta_inbox_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meta_inbox_accounts: {
         Row: {
           access_token: string
@@ -68,13 +139,19 @@ export type Database = {
           contact_profile_pic: string | null
           created_at: string | null
           empresa_id: string
+          first_response_at: string | null
+          first_response_ms: number | null
           id: string
           last_inbound_ts: string | null
           last_message: string | null
           last_message_from_me: boolean | null
           last_message_ts: string | null
+          participants_out: string[] | null
+          resolved_at: string | null
           status: string | null
           tags: string[] | null
+          total_messages_in: number | null
+          total_messages_out: number | null
           unread_count: number | null
           updated_at: string | null
         }
@@ -86,13 +163,19 @@ export type Database = {
           contact_profile_pic?: string | null
           created_at?: string | null
           empresa_id: string
+          first_response_at?: string | null
+          first_response_ms?: number | null
           id?: string
           last_inbound_ts?: string | null
           last_message?: string | null
           last_message_from_me?: boolean | null
           last_message_ts?: string | null
+          participants_out?: string[] | null
+          resolved_at?: string | null
           status?: string | null
           tags?: string[] | null
+          total_messages_in?: number | null
+          total_messages_out?: number | null
           unread_count?: number | null
           updated_at?: string | null
         }
@@ -104,13 +187,19 @@ export type Database = {
           contact_profile_pic?: string | null
           created_at?: string | null
           empresa_id?: string
+          first_response_at?: string | null
+          first_response_ms?: number | null
           id?: string
           last_inbound_ts?: string | null
           last_message?: string | null
           last_message_from_me?: boolean | null
           last_message_ts?: string | null
+          participants_out?: string[] | null
+          resolved_at?: string | null
           status?: string | null
           tags?: string[] | null
+          total_messages_in?: number | null
+          total_messages_out?: number | null
           unread_count?: number | null
           updated_at?: string | null
         }
@@ -229,6 +318,71 @@ export type Database = {
           },
         ]
       }
+      meta_inbox_metrics_daily: {
+        Row: {
+          account_id: string
+          avg_first_response_ms: number | null
+          conversations_opened: number | null
+          conversations_resolved: number | null
+          created_at: string | null
+          date: string
+          empresa_id: string
+          id: string
+          max_first_response_ms: number | null
+          media_sent: number | null
+          messages_in: number | null
+          messages_out: number | null
+          min_first_response_ms: number | null
+          templates_sent: number | null
+          unique_contacts: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          avg_first_response_ms?: number | null
+          conversations_opened?: number | null
+          conversations_resolved?: number | null
+          created_at?: string | null
+          date: string
+          empresa_id: string
+          id?: string
+          max_first_response_ms?: number | null
+          media_sent?: number | null
+          messages_in?: number | null
+          messages_out?: number | null
+          min_first_response_ms?: number | null
+          templates_sent?: number | null
+          unique_contacts?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          avg_first_response_ms?: number | null
+          conversations_opened?: number | null
+          conversations_resolved?: number | null
+          created_at?: string | null
+          date?: string
+          empresa_id?: string
+          id?: string
+          max_first_response_ms?: number | null
+          media_sent?: number | null
+          messages_in?: number | null
+          messages_out?: number | null
+          min_first_response_ms?: number | null
+          templates_sent?: number | null
+          unique_contacts?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_inbox_metrics_daily_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "meta_inbox_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meta_inbox_templates: {
         Row: {
           account_id: string
@@ -291,12 +445,50 @@ export type Database = {
           },
         ]
       }
+      meta_inbox_user_access: {
+        Row: {
+          account_id: string
+          created_at: string | null
+          id: string
+          usuario_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string | null
+          id?: string
+          usuario_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string | null
+          id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_inbox_user_access_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "meta_inbox_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_inbox_metric: {
+        Args: {
+          p_account_id: string
+          p_date: string
+          p_empresa_id: string
+          p_field: string
+          p_increment?: number
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
