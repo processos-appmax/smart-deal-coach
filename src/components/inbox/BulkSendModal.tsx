@@ -594,16 +594,22 @@ export default function BulkSendModal({
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedLog.rows_detail.map((row: any, i: number) => (
+                        {selectedLog.rows_detail.map((row: any, i: number) => {
+                          const tplDisplay = row.templateUsed
+                            || (['sent', 'delivered', 'read'].includes(row.status) ? selectedLog.template_name : null)
+                            || (row.status === 'fallback_sent' ? selectedLog.fallback_template : null)
+                            || selectedLog.template_name
+                            || '—';
+                          return (
                           <tr key={i} className="border-t border-border/50">
                             <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
                             <td className="px-3 py-1.5 font-mono">{row.phone}</td>
-                            <td className="px-3 py-1.5 text-[10px] font-mono text-muted-foreground">{row.templateUsed || '—'}</td>
+                            <td className="px-3 py-1.5 text-[10px] font-mono text-muted-foreground">{tplDisplay}</td>
                             <td className="px-3 py-1.5 text-muted-foreground truncate max-w-[200px]">{(row.params || []).join(', ')}</td>
                             <td className="px-3 py-1.5 text-center"><StatusBadge status={row.status} /></td>
                             <td className="px-3 py-1.5 text-destructive truncate max-w-[150px]">{row.error || ''}</td>
                           </tr>
-                        ))}
+                          ); })}
                       </tbody>
                     </table>
                   </div>
