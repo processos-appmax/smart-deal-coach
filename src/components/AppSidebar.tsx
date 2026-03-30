@@ -12,6 +12,7 @@ import {
   BarChart3, Zap, ChevronLeft, ChevronRight,
   LogOut, ChevronDown, Building2, Shield, Plug2,
   GraduationCap, SlidersHorizontal, User, Target, Activity, Inbox,
+  Contact, Briefcase, Ticket, Factory,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +22,7 @@ interface NavItem {
   icon: ElementType;
   badge?: number;
   resource?: string;
+  children?: NavItem[];
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -30,6 +32,18 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/inbox',        label: 'Caixa de Entrada', icon: Inbox,           resource: 'inbox' },
   { path: '/performance',  label: 'Desempenho',       icon: Activity,        resource: 'performance' },
   { path: '/training',     label: 'Treinamentos',     icon: GraduationCap,   resource: 'training' },
+  {
+    path: '/crm',
+    label: 'CRM',
+    icon: Briefcase,
+    resource: 'crm',
+    children: [
+      { path: '/crm/contacts',   label: 'Contatos',  icon: Contact,   resource: 'crm' },
+      { path: '/crm/deals',      label: 'Negócios',  icon: Briefcase, resource: 'crm' },
+      { path: '/crm/tickets',    label: 'Tickets',   icon: Ticket,    resource: 'crm' },
+      { path: '/crm/companies',  label: 'Empresas',  icon: Factory,   resource: 'crm' },
+    ],
+  },
   { path: '/teams',        label: 'Times',            icon: Target,          resource: 'teams' },
   { path: '/users',        label: 'Usuários',         icon: Users,           resource: 'users' },
   { path: '/reports',      label: 'Relatórios',       icon: BarChart3,       resource: 'reports' },
@@ -46,8 +60,11 @@ export default function AppSidebar({ collapsed, onToggle }: { collapsed: boolean
   const location = useLocation();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const isActive = (path: string) => location.pathname === path.split('?')[0];
+  const isChildActive = (item: NavItem) =>
+    item.children?.some(c => location.pathname.startsWith(c.path)) ?? false;
 
   // Normalize user ID: google_email → user_email (DB stores as user_)
   const normalizedUserId = (user?.id ?? '').replace(/^google_/, 'user_');
@@ -59,6 +76,10 @@ export default function AppSidebar({ collapsed, onToggle }: { collapsed: boolean
     const moduleOk = isModuleEnabledForUser(moduleId, normalizedUserId, user?.teamId);
     return resourceOk && moduleOk;
   }) : [];
+
+  const toggleGroup = (path: string) => {
+    setExpandedGroups(prev => ({ ...prev, [path]: !prev[path] }));
+  };
 
   const roleLabel = user?.role ? (ROLE_LABELS[user.role] ?? user.role) : 'Usuário';
   const rolePerm = user?.role ? getPermission(user.role) : undefined;
@@ -96,29 +117,77 @@ export default function AppSidebar({ collapsed, onToggle }: { collapsed: boolean
             Principal
           </p>
         )}
-        {visibleItems.map((item) => (
-          <div
-            key={item.path}
-            className={cn('nav-item', isActive(item.path) && 'active')}
-            onClick={() => navigate(item.path)}
-            title={collapsed ? item.label : undefined}
-          >
-            <item.icon className="w-4 h-4 flex-shrink-0" />
-            {!collapsed && (
-              <>
-                <span className="flex-1 truncate">{item.label}</span>
-                {item.badge && (
-                  <Badge
-                    className="h-4 min-w-[18px] px-1 text-[10px] font-bold"
-                    style={{ background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
-                  >
-                    {item.badge}
-                  </Badge>
+        {visibleItems.map((item) => {
+          // Items with children (collapsible group)
+          if (item.children && item.children.length > 0) {
+            const isOpen = expandedGroups[item.path] ?? isChildActive(item);
+            return (
+              <div key={item.path}>
+                <div
+                  className={cn('nav-item', isChildActive(item) && 'active')}
+                  onClick={() => {
+                    if (collapsed) {
+                      navigate(item.children![0].path);
+                    } else {
+                      toggleGroup(item.path);
+                    }
+                  }}
+                  title={collapsed ? item.label : undefined}
+                >
+                  <item.icon className="w-4 h-4 flex-shrink-0" />
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 truncate">{item.label}</span>
+                      <ChevronDown className={cn(
+                        'w-3 h-3 text-muted-foreground transition-transform',
+                        isOpen && 'rotate-180'
+                      )} />
+                    </>
+                  )}
+                </div>
+                {!collapsed && isOpen && (
+                  <div className="ml-4 pl-2 border-l border-sidebar-border/50 space-y-0.5 mt-0.5">
+                    {item.children.map((child) => (
+                      <div
+                        key={child.path}
+                        className={cn('nav-item text-[13px]', isActive(child.path) && 'active')}
+                        onClick={() => navigate(child.path)}
+                      >
+                        <child.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="flex-1 truncate">{child.label}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </>
-            )}
-          </div>
-        ))}
+              </div>
+            );
+          }
+
+          // Regular items
+          return (
+            <div
+              key={item.path}
+              className={cn('nav-item', isActive(item.path) && 'active')}
+              onClick={() => navigate(item.path)}
+              title={collapsed ? item.label : undefined}
+            >
+              <item.icon className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 truncate">{item.label}</span>
+                  {item.badge && (
+                    <Badge
+                      className="h-4 min-w-[18px] px-1 text-[10px] font-bold"
+                      style={{ background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
+                    >
+                      {item.badge}
+                    </Badge>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       {/* Profile */}
