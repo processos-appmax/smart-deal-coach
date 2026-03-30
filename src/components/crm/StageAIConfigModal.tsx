@@ -243,7 +243,7 @@ export default function StageAIConfigModal({
                   <Input
                     value={config.aiName}
                     onChange={e => update('aiName', e.target.value)}
-                    placeholder="Ex: Marco Rebucci"
+                    placeholder="Ex: Appmax Assistente"
                     className="h-10"
                   />
                 </div>
@@ -265,9 +265,9 @@ export default function StageAIConfigModal({
                   <Select value={config.instance} onValueChange={v => update('instance', v)}>
                     <SelectTrigger className="h-10"><SelectValue placeholder="Selecione uma instância..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="instance-1">MarcoR 🟢</SelectItem>
-                      <SelectItem value="instance-2">SupportBot 🟢</SelectItem>
-                      <SelectItem value="instance-3">SalesAI 🔴</SelectItem>
+                      <SelectItem value="instance-1">Cobranças B2C 🟢</SelectItem>
+                      <SelectItem value="instance-2">Atendimento Appmax 🟢</SelectItem>
+                      <SelectItem value="instance-3">Vendas Appmax 🔴</SelectItem>
                     </SelectContent>
                   </Select>
                   {config.instance && (
@@ -673,7 +673,7 @@ export default function StageAIConfigModal({
                     <Select value={config.ragSource} onValueChange={v => update('ragSource', v)}>
                       <SelectTrigger className="h-10"><SelectValue placeholder="Selecione uma base..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="historico-marcor">Histórico MarcoR (31577 chunks)</SelectItem>
+                        <SelectItem value="historico-appmax">Histórico Appmax (31577 chunks)</SelectItem>
                         <SelectItem value="docs-produto">Docs Produto (8420 chunks)</SelectItem>
                         <SelectItem value="faq-suporte">FAQ Suporte (2150 chunks)</SelectItem>
                       </SelectContent>
