@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, ChevronDown, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +32,9 @@ export default function SearchableSelect({
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = options.find(o => o.value === value);
@@ -42,9 +45,20 @@ export default function SearchableSelect({
     (o.sub && o.sub.toLowerCase().includes(search.toLowerCase()))
   );
 
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }, []);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        dropdownRef.current?.contains(target)
+      ) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -53,16 +67,18 @@ export default function SearchableSelect({
   useEffect(() => {
     if (open) {
       setSearch('');
+      updatePos();
       setTimeout(() => inputRef.current?.focus(), 0);
     }
-  }, [open]);
+  }, [open, updatePos]);
 
   const h = size === 'sm' ? 'h-7 text-[10px]' : 'h-9 text-xs';
 
   return (
-    <div ref={ref} className={cn('relative', className)}>
+    <div className={cn('relative', className)}>
       {/* Trigger */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
@@ -83,9 +99,13 @@ export default function SearchableSelect({
         )}
       </button>
 
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute z-50 mt-1 w-full min-w-[220px] bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+      {/* Dropdown via portal — avoids overflow:hidden clipping */}
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed bg-card border border-border rounded-lg shadow-xl overflow-hidden"
+          style={{ top: pos.top, left: pos.left, width: Math.max(pos.width, 220), zIndex: 9999 }}
+        >
           {/* Search input */}
           <div className="p-1.5 border-b border-border">
             <div className="relative">
@@ -124,7 +144,8 @@ export default function SearchableSelect({
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

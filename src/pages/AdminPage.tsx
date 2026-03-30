@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CONFIG } from '@/lib/config';
 import { callOpenAI } from '@/lib/openaiProxy';
 import { MOCK_USERS, MOCK_TEAMS, MOCK_AREAS } from '@/data/mockData';
@@ -104,7 +105,9 @@ const SCOPE_ICONS: Record<string, string> = {
 };
 
 export default function AdminPage() {
-  const [section, setSection] = useState('roles');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const section = searchParams.get('s') || 'company';
+  const setSection = (id: string) => setSearchParams({ s: id }, { replace: true });
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
   const [tokenTest, setTokenTest] = useState<Record<string, 'idle' | 'testing' | 'ok' | 'error'>>({});
   const [tokenTestMsg, setTokenTestMsg] = useState<Record<string, string>>({});
@@ -162,6 +165,8 @@ export default function AdminPage() {
 
   const { tokens, setToken, models, setModuleModel, modules, setModuleEnabled, saveConfig,
           getUserDisabledModules, setUserModuleOverride, companySubtitle, setCompanySubtitle } = useAppConfig();
+  const [subtitleDraft, setSubtitleDraft] = useState(companySubtitle);
+  useEffect(() => { setSubtitleDraft(companySubtitle); }, [companySubtitle]);
   const { user: currentUser } = useAuth();
   const { permissions, updatePermission } = useRolePermissions();
   const { getLogs, clearLogs } = useAuditLog();
@@ -401,19 +406,26 @@ export default function AdminPage() {
                   <label className="text-xs font-medium block mb-1.5">Subtítulo (exibido na sidebar e aba do navegador)</label>
                   <div className="flex gap-2">
                     <Input
-                      value={companySubtitle}
-                      onChange={e => setCompanySubtitle(e.target.value)}
+                      value={subtitleDraft}
+                      onChange={e => setSubtitleDraft(e.target.value)}
                       placeholder="Revenue OS"
                       className="h-9 text-sm bg-secondary border-border"
                     />
+                    <Button
+                      size="sm"
+                      className="bg-gradient-primary text-xs h-9 px-4"
+                      onClick={() => {
+                        setCompanySubtitle(subtitleDraft);
+                        toast({ title: 'Subtítulo salvo!', description: `Atualizado para "${subtitleDraft}".` });
+                      }}
+                      disabled={subtitleDraft === companySubtitle}
+                    >
+                      <Save className="w-3 h-3 mr-1" /> Salvar
+                    </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Aparece como "APPMAX · {companySubtitle}" na sidebar e "Appmax {companySubtitle}" na aba.</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Aparece como "APPMAX · {subtitleDraft}" na sidebar e "Appmax {subtitleDraft}" na aba.</p>
                 </div>
               </div>
-
-              <Button size="sm" className="bg-gradient-primary text-xs">
-                <Save className="w-3 h-3 mr-1" /> Salvar Alterações
-              </Button>
             </div>
           )}
 
