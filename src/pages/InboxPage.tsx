@@ -483,9 +483,9 @@ export default function InboxPage() {
     if (!selectedConv) { setMessages([]); return; }
     setLoadingMsgs(true);
     try {
-      const data = await loadMessages(selectedConv.id);
+      const data = await loadMessages(selectedConv.id, selectedAccount?.id);
       setMessages(data);
-      markConversationRead(selectedConv.id);
+      markConversationRead(selectedConv.id, selectedAccount?.id);
     } catch { /* silent */ }
     finally { setLoadingMsgs(false); }
   }, [selectedConv?.id]);
@@ -496,7 +496,7 @@ export default function InboxPage() {
   useEffect(() => {
     if (!selectedConv) return;
     const t = setInterval(async () => {
-      const data = await loadMessages(selectedConv.id);
+      const data = await loadMessages(selectedConv.id, selectedAccount?.id);
       setMessages(data);
     }, 3000);
     return () => clearInterval(t);
@@ -515,7 +515,7 @@ export default function InboxPage() {
     const result = await sendTextMessage(selectedAccount, selectedConv.id, selectedConv.contact_phone, msgInput.trim());
     if (result.success) {
       setMsgInput('');
-      const data = await loadMessages(selectedConv.id);
+      const data = await loadMessages(selectedConv.id, selectedAccount?.id);
       setMessages(data);
     } else {
       toast({ variant: 'destructive', title: 'Erro ao enviar', description: result.error });
@@ -551,7 +551,7 @@ export default function InboxPage() {
       );
 
       if (result.success) {
-        const data = await loadMessages(selectedConv.id);
+        const data = await loadMessages(selectedConv.id, selectedAccount?.id);
         setMessages(data);
       } else {
         toast({ variant: 'destructive', title: 'Erro ao enviar mídia', description: result.error });
@@ -612,7 +612,7 @@ export default function InboxPage() {
         pickerSelectedTpl.name, pickerSelectedTpl.language, components, renderedBody,
       );
       if (result.success) {
-        const data = await loadMessages(selectedConv.id);
+        const data = await loadMessages(selectedConv.id, selectedAccount?.id);
         setMessages(data);
         toast({ title: 'Template enviado!', description: pickerSelectedTpl.name });
       } else {
@@ -647,7 +647,7 @@ export default function InboxPage() {
       if (result.success) {
         // Delete the failed message
         await (supabase as any).from('meta_inbox_messages').delete().eq('id', msg.id);
-        const data = await loadMessages(selectedConv.id);
+        const data = await loadMessages(selectedConv.id, selectedAccount?.id);
         setMessages(data);
         toast({ title: 'Mensagem reenviada!' });
       } else {
@@ -690,7 +690,7 @@ export default function InboxPage() {
             'audio', uploadData.id, undefined, undefined, true,
           );
           if (result.success) {
-            const data = await loadMessages(selectedConv!.id);
+            const data = await loadMessages(selectedConv!.id, selectedAccount?.id);
             setMessages(data);
           } else {
             toast({ variant: 'destructive', title: 'Erro ao enviar áudio', description: result.error });
@@ -719,8 +719,8 @@ export default function InboxPage() {
   const handleDeleteConversation = async (conv: InboxConversation) => {
     try {
       // Delete messages first, then conversation
-      await (supabase as any).from('meta_inbox_messages').delete().eq('conversation_id', conv.id);
-      await (supabase as any).from('meta_inbox_conversations').delete().eq('id', conv.id);
+      await (supabase as any).from('meta_inbox_messages').delete().eq('conversation_id', conv.id).eq('account_id', selectedAccount?.id);
+      await (supabase as any).from('meta_inbox_conversations').delete().eq('id', conv.id).eq('account_id', selectedAccount?.id);
       if (selectedConv?.id === conv.id) { setSelectedConv(null); setMessages([]); }
       setConfirmDeleteConv(null);
       await loadConvs();
@@ -918,7 +918,7 @@ export default function InboxPage() {
             </div>
           ) : filteredConvs.map(conv => (
             <div key={conv.id}
-              onClick={() => { setSelectedConv(conv); markConversationRead(conv.id); }}
+              onClick={() => { setSelectedConv(conv); markConversationRead(conv.id, selectedAccount?.id); }}
               className={cn('flex items-start gap-2.5 px-3 py-3 cursor-pointer border-b border-border/50 transition-colors',
                 selectedConv?.id === conv.id ? 'bg-primary/5' : 'hover:bg-muted/40')}>
               <AvatarInitials name={conv.contact_name || conv.contact_phone} />

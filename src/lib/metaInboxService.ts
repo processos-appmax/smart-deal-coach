@@ -76,23 +76,26 @@ export async function loadConversations(accountId: string): Promise<InboxConvers
 }
 
 // ─── Load messages for a conversation ───────────────────────────────────────
-export async function loadMessages(conversationId: string): Promise<InboxMessage[]> {
-  const { data, error } = await supabase
+export async function loadMessages(conversationId: string, accountId?: string): Promise<InboxMessage[]> {
+  let query = supabase
     .from('meta_inbox_messages')
     .select('*')
-    .eq('conversation_id', conversationId)
-    .order('timestamp', { ascending: true });
+    .eq('conversation_id', conversationId);
+  if (accountId) query = query.eq('account_id', accountId);
+  const { data, error } = await query.order('timestamp', { ascending: true });
 
   if (error) { console.error('[metaInbox] loadMessages:', error); return []; }
   return (data || []) as InboxMessage[];
 }
 
 // ─── Mark conversation as read ──────────────────────────────────────────────
-export async function markConversationRead(conversationId: string) {
-  await supabase
+export async function markConversationRead(conversationId: string, accountId?: string) {
+  let query = supabase
     .from('meta_inbox_conversations')
     .update({ unread_count: 0 })
     .eq('id', conversationId);
+  if (accountId) query = query.eq('account_id', accountId);
+  await query;
 }
 
 // ─── Check 24h window ───────────────────────────────────────────────────────
@@ -151,7 +154,7 @@ export async function sendTextMessage(
       last_message: text,
       last_message_ts: new Date().toISOString(),
       last_message_from_me: true,
-    }).eq('id', conversationId);
+    }).eq('id', conversationId).eq('account_id', account.id);
 
     return { success: true, wamid };
   } catch (e: any) {
@@ -229,7 +232,7 @@ export async function sendMediaMessage(
       last_message: bodyText,
       last_message_ts: new Date().toISOString(),
       last_message_from_me: true,
-    }).eq('id', conversationId);
+    }).eq('id', conversationId).eq('account_id', account.id);
 
     return { success: true, wamid };
   } catch (e: any) {
@@ -324,7 +327,7 @@ export async function sendTemplateMessage(
       last_message: displayMsg,
       last_message_ts: new Date().toISOString(),
       last_message_from_me: true,
-    }).eq('id', conversationId);
+    }).eq('id', conversationId).eq('account_id', account.id);
 
     return { success: true, wamid };
   } catch (e: any) {

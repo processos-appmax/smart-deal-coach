@@ -143,8 +143,8 @@ async function insertInboundMessage(convId: string, accountId: string, empresaId
   return body;
 }
 
-// ─── Update message status ──────────────────────────────────────────────────
-async function updateMessageStatus(wamid: string, status: string, ts: Date, errorCode?: string, errorMsg?: string) {
+// ─── Update message status (scoped by account) ─────────────────────────────
+async function updateMessageStatus(wamid: string, accountId: string, status: string, ts: Date, errorCode?: string, errorMsg?: string) {
   const updates: Record<string, unknown> = { status };
   if (status === 'sent') updates.sent_at = ts.toISOString();
   if (status === 'delivered') updates.delivered_at = ts.toISOString();
@@ -154,7 +154,20 @@ async function updateMessageStatus(wamid: string, status: string, ts: Date, erro
     if (errorCode) updates.error_code = errorCode;
     if (errorMsg) updates.error_message = errorMsg;
   }
-  await sb.from('meta_inbox_messages').update(updates).eq('wamid', wamid);
+  await sb.from('meta_inbox_messages').update(updates).eq('wamid', wamid).eq('account_id', accountId);
+}
+
+// ─── Increment daily metric ─────────────────────────────────────────────────
+async function trackMetric(accountId: string, empresaId: string, field: string, increment = 1) {
+  try {
+    await sb.rpc('update_inbox_metric', {
+      p_account_id: accountId,
+      p_empresa_id: empresaId,
+      p_date: new Date().toISOString().slice(0, 10),
+      p_field: field,
+      p_increment: increment,
+    });
+  } catch { /* silent — metrics are best-effort */ }
 }
 
 // ─── Log webhook event to DB ────────────────────────────────────────────────
@@ -185,7 +198,10 @@ async function handleMessages(value: any) {
     const convId = await upsertConversation(account.id, account.empresa_id, contactPhone, contactName, '', false, ts);
     if (convId) {
       const lastMsg = await insertInboundMessage(convId, account.id, account.empresa_id, msg, contactPhone);
-      await sb.from('meta_inbox_conversations').update({ last_message: lastMsg, last_message_ts: ts.toISOString() }).eq('id', convId);
+      await sb.from('meta_inbox_conversations').update({
+        last_message: lastMsg, last_message_ts: ts.toISOString(),
+      }).eq('id', convId);
+      // Metrics are tracked automatically by DB triggers (trg_inbox_message_metrics)
       log(`Inbound: ${contactPhone} → ${lastMsg.slice(0, 50)}`);
     }
   }
@@ -199,7 +215,7 @@ async function handleMessages(value: any) {
     const errorMsg = st.errors?.[0]?.title || st.errors?.[0]?.message;
 
     if (wamid && status) {
-      await updateMessageStatus(wamid, status, ts, errorCode, errorMsg);
+      await updateMessageStatus(wamid, account.id, status, ts, errorCode, errorMsg);
       log(`Status: ${wamid.slice(0, 20)}... → ${status}${errorCode ? ` (${errorCode})` : ''}`);
     }
   }
