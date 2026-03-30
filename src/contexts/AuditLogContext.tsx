@@ -44,6 +44,7 @@ function roleToDb(role: UserRole): string {
     coordinator: 'coordenador',
     supervisor: 'supervisor',
     member: 'vendedor',
+    support: 'suporte',
   };
   return map[role];
 }

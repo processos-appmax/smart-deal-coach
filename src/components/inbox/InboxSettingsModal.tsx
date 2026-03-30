@@ -224,7 +224,7 @@ export default function InboxSettingsModal({ onClose, onSaved, accounts = [], on
           .in('id', ids);
         const usrMap = new Map((usrs || []).map((u: any) => [u.id, u]));
         for (const row of rows) {
-          const u = usrMap.get(row.usuario_id);
+          const u: any = usrMap.get(row.usuario_id);
           if (u) { row.nome = u.nome; row.email = u.email; }
         }
       }
